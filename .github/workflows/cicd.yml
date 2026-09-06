@@ -1,0 +1,95 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: 🧹 LINT
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/uv
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: ${{ runner.os }}-deps-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip uv
+          uv sync
+
+      - name: Run ruff
+        run: |
+          uv run ruff check .
+
+  typecheck:
+    name: 🔍 TYPECHECK
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/uv
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: ${{ runner.os }}-deps-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip uv
+          uv sync
+
+      - name: Run ty
+        run: |
+          uv run ty check
+
+  test:
+    name: 🧪 TEST
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.14
+    needs: typecheck
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/uv
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: ${{ runner.os }}-deps-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip uv
+          uv sync
+
+      - name: Run tests
+        run: |
+          uv run pytest --maxfail=1 --disable-warnings
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: test-reports/

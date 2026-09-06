@@ -1,0 +1,10 @@
+connector:
+  llm:
+    name: llm_provider
+    type: api
+    base_url: ${oc.env:LLM_BASE_URL,http://nautilus:1234/v1}
+    timeout: 5
+    retry: 3
+    certificate: ""
+    auth:
+      type: none

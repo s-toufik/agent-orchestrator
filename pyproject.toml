@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent"
+version = "1.0.0"
+authors = [
+    { name = "Toufik Saouchi", email = "toufik.saouchi@gmail.com" },
+]
+description = "Analytics agent -- talks to its MCP toolbox as an independently deployed service"
+readme = "Readme.md"
+requires-python = ">=3.14"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "uvloop",
+    "starlette",
+    "httpx",
+    "httpx2",
+    "aiosqlite",
+    "mcp",
+    "pycraftcore>=1.1.2,<2",
+    "pydantic>=2",
+    "python-dotenv",
+    "langchain",
+    "langchain-core",
+    "langchain-openai",
+    "langgraph",
+    "langgraph-checkpoint-sqlite",
+]
+
+[project.scripts]
+agent = "bootstrap.application.agent_application:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.6.0",
+    "hypothesis>=6.151.9",
+    "Faker",
+    "ruff",
+    "ty",
+    "pre-commit",
+    "deepeval>=4.2.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "evaluation: live DeepEval agent-quality tests -- call a real local LLM and a real toolbox; excluded by default, run explicitly with `pytest -m evaluation tests/evaluation`",
+]
+addopts = "-m 'not evaluation'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "I"]
+ignore = [
+    "E501",   # line length, handled by the formatter
+    "BLE001", # blind exception, deliberate at adapter boundaries
+]
+
+[tool.ty.src]
+include = ["src", "tests"]
+exclude = [".venv"]
+
+[project.urls]
+Homepage = "https://github.com/s-toufik/agent"

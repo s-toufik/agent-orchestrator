@@ -1,0 +1,32 @@
+# Mac
+.DS_Store
+**/.DS_Store
+
+# Python-generated files
+__pycache__/
+*.pyc
+*.py[oc]
+build/
+dist/
+wheels/
+.coverage
+*.egg-info
+
+# Virtual environments
+.venv
+
+# env
+.env
+
+# IDEs
+.idea/
+.vscode
+
+# Dev
+.hypothesis
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.deepeval
+
+*.db

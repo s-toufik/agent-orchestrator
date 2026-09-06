@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+env:
+  APP_ENV: debug
+  APPLICATION_API_ROOT_PATH: /agent
+  CONFIGURATION_DIR: /app/config
+  TOOLBOX_URL: http://agent-toolbox:8001/mcp
+  LLM_BASE_URL: http://llm-provider:1234/v1
+
+# Secret-backed env vars (checkpointer sqlite path, etc.) -- set via
+# --set-string or a values override, not committed here.
+secretEnv: {}
+
+probes:
+  path: /actuator/health
+  livenessPath: /actuator/health/liveness
+  readinessPath: /actuator/health/readiness
