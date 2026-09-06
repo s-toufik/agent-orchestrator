@@ -17,8 +17,6 @@ from bootstrap.configuration.settings import ProcessSettings
 
 
 class SetApplicationConfiguration:
-    """Loads the YAML configuration tree for one process role."""
-
     def __init__(self, settings: ProcessSettings, logger: Logger | None = None) -> None:
         self._settings = settings
         self._logger = create_logger(logger)

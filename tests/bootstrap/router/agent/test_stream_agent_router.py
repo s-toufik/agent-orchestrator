@@ -29,7 +29,7 @@ def test_posting_to_the_endpoint_forwards_the_parsed_request_to_the_controller()
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/agent/stream",
+        "/v1/stream",
         json={"message": "hi", "model_name": "gpt-oss-20b", "request_id": "r1"},
     )
 

@@ -6,8 +6,8 @@ from agent.adapter.inbound.web.schema.agent_request_schema import AgentRequestSc
 
 
 class StreamAgentRouter:
-    PREFIX: str = "/api/v1"
-    ENDPOINT: str = "/agent/stream"
+    PREFIX: str = "/v1"
+    ENDPOINT: str = "/stream"
 
     def __init__(self, controller: StreamAgentController) -> None:
         self._controller = controller

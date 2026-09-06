@@ -98,7 +98,7 @@ async def test_boot_wires_both_routers_and_becomes_ready(running_toolbox, monkey
 
     assert container.is_ready is True
     prefixes = {router.prefix for router in container.routers}
-    assert prefixes == {"/api/v1", "/actuator"}
+    assert prefixes == {"/v1", "/actuator"}
 
     await container.stop()
 
