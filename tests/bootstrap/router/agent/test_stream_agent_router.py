@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from starlette.responses import StreamingResponse
 from starlette.testclient import TestClient
 
-from agent.adapter.inbound.web.controller.stream_agent_controller import StreamAgentController
-from agent.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
+from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
+    StreamAgentController,
+)
+from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
 
 

@@ -6,7 +6,7 @@ from bootstrap.di.base_di import BaseDI
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 
-def make_settings(role: str = "agent") -> ProcessSettings:
+def make_settings(role: str = "agent-orchestrator") -> ProcessSettings:
     return ProcessSettings(
         role=role,
         environment="debug",

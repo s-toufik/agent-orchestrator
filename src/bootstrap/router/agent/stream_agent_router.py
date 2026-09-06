@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Body
 from starlette.responses import StreamingResponse
 
-from agent.adapter.inbound.web.controller.stream_agent_controller import StreamAgentController
-from agent.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
+from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
+    StreamAgentController,
+)
+from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
 
 
 class StreamAgentRouter:

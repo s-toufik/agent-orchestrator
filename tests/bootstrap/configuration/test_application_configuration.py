@@ -9,7 +9,7 @@ from bootstrap.configuration.settings import ProcessSettings
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 
-def make_settings(directory: Path, role: str = "agent") -> ProcessSettings:
+def make_settings(directory: Path, role: str = "agent-orchestrator") -> ProcessSettings:
     return ProcessSettings(
         role=role, environment="debug", configuration_directory=directory, host="0.0.0.0", port=8000
     )

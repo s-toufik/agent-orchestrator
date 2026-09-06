@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: agent
+  repository: agent-orchestrator
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -19,7 +19,7 @@ resources:
 
 env:
   APP_ENV: debug
-  APPLICATION_API_ROOT_PATH: /agent
+  APPLICATION_API_ROOT_PATH: /agent-orchestrator
   CONFIGURATION_DIR: /app/config
   TOOLBOX_URL: http://agent-toolbox:8001/mcp
   LLM_BASE_URL: http://llm-provider:1234/v1

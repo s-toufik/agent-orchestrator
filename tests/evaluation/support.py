@@ -1,7 +1,7 @@
 from deepeval.test_case import ToolCall
 
-from agent.adapter.outbound.langgraph.enum.role import Role
-from agent.adapter.outbound.langgraph.schema.agent_state import AgentState
+from agent_orchestrator.adapter.outbound.langgraph.enum.role import Role
+from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
 
 
 def tools_called(state: AgentState) -> list[ToolCall]:

@@ -34,11 +34,11 @@ async def _lifespan(application: FastAPI, container: AgentContainer) -> AsyncGen
 
 
 def create_agent_application(settings: ProcessSettings | None = None) -> FastAPI:
-    process_settings = settings or ProcessSettings.for_role("agent", DEFAULT_PORT)
+    process_settings = settings or ProcessSettings.for_role("agent-orchestrator", DEFAULT_PORT)
     container = AgentContainer(process_settings)
 
     application = FastAPI(
-        title="agent",
+        title="agent-orchestrator",
         lifespan=lambda app: _lifespan(app, container),
     )
 
@@ -61,7 +61,7 @@ app: FastAPI = create_agent_application()
 def main() -> None:
     import uvicorn
 
-    settings = ProcessSettings.for_role("agent", DEFAULT_PORT)
+    settings = ProcessSettings.for_role("agent-orchestrator", DEFAULT_PORT)
     uvicorn.run(
         "bootstrap.application.agent_application:app",
         host=settings.host,

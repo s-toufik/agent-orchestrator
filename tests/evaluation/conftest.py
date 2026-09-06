@@ -29,11 +29,11 @@ from pathlib import Path
 
 import pytest
 
-from agent.adapter.outbound.langgraph.lang_agent import LangAgent
-from agent.adapter.outbound.langgraph.schema.agent_state import AgentState
-from agent.adapter.outbound.langgraph.service.state_serialization import unpack_state
-from agent.domain.model.agent_message import AgentMessage
-from agent.domain.model.agent_request import AgentRequest
+from agent_orchestrator.adapter.outbound.langgraph.lang_agent import LangAgent
+from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
+from agent_orchestrator.adapter.outbound.langgraph.service.state_serialization import unpack_state
+from agent_orchestrator.domain.model.agent_message import AgentMessage
+from agent_orchestrator.domain.model.agent_request import AgentRequest
 from bootstrap.configuration.settings import ProcessSettings
 from bootstrap.di.agent_di import AgentDI
 from tests.evaluation.local_judge_model import LocalJudgeModel
@@ -64,7 +64,7 @@ def _base_env(monkeypatch, tmp_path):
 
 @pytest.fixture
 async def agent_di(_base_env) -> AsyncIterator[AgentDI]:
-    di = AgentDI(_settings("agent", 8000))
+    di = AgentDI(_settings("agent-orchestrator", 8000))
     try:
         yield di
     finally:

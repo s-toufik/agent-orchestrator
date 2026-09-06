@@ -22,17 +22,17 @@ from pycraftcore.resilient_http.adapter import ResilientTransportFactory
 from pycraftcore.resilient_http.configuration import ResilientHttpSettings
 from pycraftcore.retry.configuration import RetrySettings
 
-from agent.adapter.outbound.langgraph.build_agent import build_agent
-from agent.adapter.outbound.llm.factory import LLMChat
-from agent.adapter.outbound.llm.mapper import ModelSettingsMapper
-from agent.adapter.outbound.llm.schema import ModelConnector, ModelParameters
-from agent.adapter.outbound.tool.mcp.mcp_tool_provider import McpToolProvider
-from agent.adapter.outbound.tool.mcp.streamable_http_session_factory import (
+from agent_orchestrator.adapter.outbound.langgraph.build_agent import build_agent
+from agent_orchestrator.adapter.outbound.llm.factory import LLMChat
+from agent_orchestrator.adapter.outbound.llm.mapper import ModelSettingsMapper
+from agent_orchestrator.adapter.outbound.llm.schema import ModelConnector, ModelParameters
+from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool_provider import McpToolProvider
+from agent_orchestrator.adapter.outbound.tool.mcp.streamable_http_session_factory import (
     StreamableHttpSessionFactory,
 )
-from agent.adapter.outbound.tool.tool_registry import ToolRegistry
-from agent.application.port.outbound.tool_port import ToolPort, ToolRegistryPort
-from agent.application.use_case.stream_agent_usecase import on_token
+from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
+from agent_orchestrator.application.port.outbound.tool_port import ToolPort, ToolRegistryPort
+from agent_orchestrator.application.use_case.stream_agent_usecase import on_token
 from bootstrap.di.base_di import BaseDI
 
 MCP_CONNECTOR_NAME: str = "toolbox"

@@ -9,9 +9,9 @@ def test_for_role_uses_explicit_env_overrides(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_HOST", "127.0.0.1")
     monkeypatch.setenv("AGENT_PORT", "9000")
 
-    settings = ProcessSettings.for_role("agent", default_port=8000)
+    settings = ProcessSettings.for_role("agent-orchestrator", default_port=8000)
 
-    assert settings.role == "agent"
+    assert settings.role == "agent-orchestrator"
     assert settings.environment == "prod"
     assert str(settings.configuration_directory) == "/custom/config"
     assert settings.host == "127.0.0.1"
@@ -36,7 +36,7 @@ def test_each_role_reads_its_own_host_and_port_prefix(monkeypatch) -> None:
     monkeypatch.delenv("AGENT_HOST", raising=False)
     monkeypatch.setenv("TOOLBOX_HOST", "10.0.0.5")
 
-    agent_settings = ProcessSettings.for_role("agent", default_port=8000)
+    agent_settings = ProcessSettings.for_role("agent-orchestrator", default_port=8000)
     toolbox_settings = ProcessSettings.for_role("toolbox", default_port=8001)
 
     assert agent_settings.host == "0.0.0.0"

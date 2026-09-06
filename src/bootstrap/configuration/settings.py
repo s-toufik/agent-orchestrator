@@ -16,7 +16,7 @@ class ProcessSettings:
     @classmethod
     def for_role(cls, role: str, default_port: int) -> ProcessSettings:
         dotenv.load_dotenv()
-        prefix = role.upper()
+        prefix = role.split("-")[0].upper()
         directory = os.getenv("CONFIGURATION_DIR", "./config")
 
         return cls(

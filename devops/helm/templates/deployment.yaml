@@ -15,7 +15,7 @@ spec:
         app: {{ .Release.Name }}
     spec:
       containers:
-        - name: agent
+        - name: agent-orchestrator
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

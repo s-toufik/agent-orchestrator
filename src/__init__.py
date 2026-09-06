@@ -5,7 +5,7 @@ import dotenv
 
 dotenv.load_dotenv()
 
-APPLICATION_NAME: str = "agent"
+APPLICATION_NAME: str = "agent-orchestrator"
 project_metadata: PackageMetadata = metadata(APPLICATION_NAME)
 APPLICATION_VERSION: str = project_metadata.get("version", "X.X.X")
 APPLICATION_API_ROOT_PATH: str = os.getenv("APPLICATION_API_ROOT_PATH", f"/{APPLICATION_NAME}")

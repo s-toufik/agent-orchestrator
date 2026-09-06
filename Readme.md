@@ -1,4 +1,4 @@
-# agent
+# agent-orchestrator
 
 An analytics agent that talks to its MCP tool server over HTTP. The toolbox
 is a separate, independently deployed service (see the `agent_toolbox`
@@ -137,5 +137,5 @@ uv run pre-commit run --all-files --hook-stage pre-commit
 
 ```bash
 make docker_build
-helm install agent devops/helm -f devops/helm/values.yaml
+helm install agent-orchestrator devops/helm -f devops/helm/values.yaml
 ```

@@ -5,13 +5,15 @@ from fastapi import APIRouter
 from pycraftcore.application_configuration import ApplicationConfiguration
 from pycraftcore.logger.port import Logger
 
-from agent.adapter.inbound.web.controller.stream_agent_controller import StreamAgentController
-from agent.adapter.outbound.langgraph.lang_agent import LangAgent
-from agent.adapter.outbound.streaming.sse_queue import SSEQueue
-from agent.application.port.inbound.stream_agent_port import StreamAgentPort
-from agent.application.port.outbound.agent_port import AgentPort
-from agent.application.port.outbound.sse_queue_port import SSEQueuePort
-from agent.application.use_case.stream_agent_usecase import StreamAgentUseCase
+from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
+    StreamAgentController,
+)
+from agent_orchestrator.adapter.outbound.langgraph.lang_agent import LangAgent
+from agent_orchestrator.adapter.outbound.streaming.sse_queue import SSEQueue
+from agent_orchestrator.application.port.inbound.stream_agent_port import StreamAgentPort
+from agent_orchestrator.application.port.outbound.agent_port import AgentPort
+from agent_orchestrator.application.port.outbound.sse_queue_port import SSEQueuePort
+from agent_orchestrator.application.use_case.stream_agent_usecase import StreamAgentUseCase
 from bootstrap.di.agent_di import AgentDI
 from bootstrap.router.actuator.actuator_router import ActuatorRouter
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
