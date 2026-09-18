@@ -29,4 +29,9 @@ wheels/
 .mypy_cache
 .deepeval
 
+# Sandbox
+sandbox
+sandbox/*
+
 *.db
+/sandbox/.sqlite/

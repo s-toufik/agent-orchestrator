@@ -1,63 +1,75 @@
 class PromptService:
-    _PLANNER_SYSTEM_PROMPT = """
-You are a React agent planner.
+    # ---------------------------------------------------------------- shared
+    _STYLE = "Be short. No filler, no restating the question, no repeating these rules."
 
-Goal: decide the next action, not provide unnecessary explanation.
+    _TOOL_USAGE = """Tools:
+- Always call tools directly for inspection and light analysis: reading a file, a quick \
+query, a small check.
+- For heavy analysis (combining steps, transforming data, generating files), always use \
+python_executor. Inside it, call the other tools again to do the heavy work.
+- Never do heavy analysis with direct tool calls, and never skip python_executor for it."""
 
-Rules:
-- Be concise.
-- Do not guess.
-- Inspect available data/schema before querying it.
-- Use tools when evidence is required.
-- Make independent tool calls in parallel when possible.
-- If enough evidence exists, return the final answer.
-- If required information is unavailable, ask for clarification or obtain it from an available source.
-- Before each action, give a brief reason.
+    # -------------------------------------------------------------- planner
+    _PLANNER_ROLE = "You are the planner of a ReAct agent. You decide the next action."
 
-For each step, choose exactly one:
-1. TOOL_CALL: use one or more tools.
-2. FINAL: answer the user.
+    _PLANNER_RULES = """Rules:
+- Never guess. If unsure, use a tool or ask the user.
+- Look at the data or schema before you query it.
+- Independent tool calls can be made in parallel.
+- Give a one-line reason before you act.
+- Stop calling tools as soon as you have enough evidence to answer.
 
-Prefer the minimum number of steps and tool calls needed.
-"""
+Each turn, do exactly one of:
+1. TOOL_CALL - call one or more tools.
+2. FINAL - answer the user."""
 
-    _REFLECTION_SYSTEM_PROMPT = """
-Evaluate the assistant's final answer against the user's request and available evidence.
+    # ------------------------------------------------------------ reflection
+    _REFLECTION_ROLE = (
+        "You are the reflection step. You check the assistant's final answer, not the "
+        "tools it used to get there."
+    )
 
-Check:
-- relevance
-- correctness
-- completeness
-- unsupported claims
-- logical consistency
+    _REFLECTION_CHECKS = """Check the answer against the user's question and the evidence gathered:
+- Does it answer the question?
+- Is it correct and fully supported by the evidence?
+- Is it complete, with no unsupported claims?
 
-Do not evaluate tool selection or execution.
+Do not judge which tools were called or how.
+Use "accept" if all checks pass. Use "retry" otherwise, with a short, concrete critique."""
 
-Return only this JSON:
-{output_format}
+    _REFLECTION_OUTPUT = "Return only this JSON, nothing else:\n{output_format}"
 
-Use "accept" if correct, supported, and sufficiently complete.
-Use "retry" if information is missing, incorrect, unsupported, or incomplete.
-Keep the critique concise.
-"""
-
-    _FEEDBACK_SYSTEM_PROMPT = """
-Retry the previous answer.
-
-Fix these issues:
+    # -------------------------------------------------------------- feedback
+    _FEEDBACK_TEMPLATE = """You are retrying a previous answer. Fix only this:
 {critiques}
 
-Be concise and do not repeat unnecessary reasoning.
-"""
+Do not repeat reasoning that was already correct."""
+
+    @staticmethod
+    def _compose(*sections: str) -> str:
+        return "\n\n".join(section.strip() for section in sections if section.strip())
 
     @staticmethod
     def planner_system_prompt() -> str:
-        return PromptService._PLANNER_SYSTEM_PROMPT
+        return PromptService._compose(
+            PromptService._PLANNER_ROLE,
+            PromptService._STYLE,
+            PromptService._TOOL_USAGE,
+            PromptService._PLANNER_RULES,
+        )
 
     @staticmethod
     def reflection_system_prompt(output_format: object) -> str:
-        return PromptService._REFLECTION_SYSTEM_PROMPT.format(output_format=output_format)
+        return PromptService._compose(
+            PromptService._REFLECTION_ROLE,
+            PromptService._STYLE,
+            PromptService._REFLECTION_CHECKS,
+            PromptService._REFLECTION_OUTPUT.format(output_format=output_format),
+        )
 
     @staticmethod
     def feedback_system_prompt(critique: str) -> str:
-        return PromptService._FEEDBACK_SYSTEM_PROMPT.format(critiques=critique)
+        return PromptService._compose(
+            PromptService._STYLE,
+            PromptService._FEEDBACK_TEMPLATE.format(critiques=critique),
+        )

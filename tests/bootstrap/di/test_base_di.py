@@ -11,14 +11,17 @@ def make_settings(role: str = "agent-orchestrator") -> ProcessSettings:
         role=role,
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
-        host="0.0.0.0",
-        port=8000,
     )
 
 
 def _set_required_env(monkeypatch) -> None:
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", "/tmp")
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", "/tmp")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
 
 
 class RecordingClient:

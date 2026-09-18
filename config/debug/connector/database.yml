@@ -1,11 +1,27 @@
 connector:
-  checkpointer:
+  sqlite_checkpointer:
     name: conversation_checkpointer
     type: database
     engine: sqlite
-    host: ${oc.env:CHECKPOINT_DB_HOST}
+    host: ${oc.env:DB_SQLITE_CHECKPOINT_HOST}
     port: 0
-    default_name: ${oc.env:CHECKPOINT_DB_NAME}
-    pool: {}
+    default_name: ${oc.env:DB_SQLITE_CHECKPOINT_NAME}
+    pool:
+      ttl: 3600
     auth:
       type: none
+
+  mongodb_checkpointer:
+    name: conversation_checkpointer
+    type: database
+    engine: mongodb
+    host: ${oc.env:DB_MONGO_CHECKPOINT_HOST}
+    port: ${oc.env:DB_MONGO_CHECKPOINT_PORT}
+    default_name: ${oc.env:DB_MONGO_CHECKPOINT_NAME}
+    pool:
+      timeout_ms: 3000
+      ttl: 3600
+    auth:
+      type: basic
+      username: ${oc.env:DB_MONGO_CHECKPOINT_USERNAME}
+      password: ${oc.env:DB_MONGO_CHECKPOINT_PASSWORD}

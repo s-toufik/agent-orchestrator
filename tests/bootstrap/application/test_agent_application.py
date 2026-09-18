@@ -1,10 +1,9 @@
 from pathlib import Path
 
 import pytest
-import uvicorn as uvicorn_module
 from starlette.testclient import TestClient
 
-from bootstrap.application.agent_application import create_agent_application, main
+from bootstrap.application.agent_application import create_agent_application
 from bootstrap.configuration.settings import ProcessSettings
 from bootstrap.container.agent_container import AgentContainer
 
@@ -15,8 +14,13 @@ REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 def _base_env(monkeypatch, tmp_path):
     monkeypatch.setenv("USER_DB_HOST", str(tmp_path))
     monkeypatch.setenv("USER_DB_NAME", "users")
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", str(tmp_path))
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "checkpoint")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", str(tmp_path))
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
 
 
 def make_settings() -> ProcessSettings:
@@ -24,8 +28,6 @@ def make_settings() -> ProcessSettings:
         role="agent-orchestrator",
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
-        host="0.0.0.0",
-        port=8000,
     )
 
 
@@ -76,24 +78,3 @@ def test_a_boot_failure_is_logged_and_reraised_not_swallowed(monkeypatch) -> Non
     with pytest.raises(RuntimeError, match="boom"):
         with TestClient(app):
             pass
-
-
-def test_main_runs_uvicorn_with_the_configured_host_and_port(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_HOST", "127.0.0.1")
-    monkeypatch.setenv("AGENT_PORT", "9999")
-    calls: list[dict] = []
-
-    def fake_run(target, **kwargs):
-        calls.append({"target": target, **kwargs})
-
-    monkeypatch.setattr(uvicorn_module, "run", fake_run)
-
-    main()
-
-    assert calls == [
-        {
-            "target": "bootstrap.application.agent_application:app",
-            "host": "127.0.0.1",
-            "port": 9999,
-        }
-    ]

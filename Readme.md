@@ -107,6 +107,26 @@ Discovered 5 MCP tools from 'external_mcp_analytics': ...
 
 ---
 
+## Logging
+
+By default this service logs through **loguru**. To switch to Python's
+**standard `logging`** module instead:
+
+- Open `src/bootstrap/di/base_di.py`
+- Replace the `LoguruLogger` import with `StandardLogger`
+  (`from pycraftcore.logger.adapter import StandardLogger`)
+- In `_logging`, replace `LoguruLogger()` with `StandardLogger()`
+- In `_telemetry_provider`, remove the `self._logging.attach(log_handler)`
+  line -- `StandardLogger` already flows into the same pipeline the OTel
+  exporter is attached to at the root logger, so keeping that line would
+  ship every log line twice
+- Restart the service
+
+No config file or environment variable change is needed -- this is a
+one-line adapter swap in the composition root.
+
+---
+
 ## Development
 
 ```bash

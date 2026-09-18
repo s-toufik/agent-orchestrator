@@ -18,7 +18,6 @@ from bootstrap.di.agent_di import AgentDI
 from bootstrap.router.actuator.actuator_router import ActuatorRouter
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
 from src import (
-    APPLICATION_API_ROOT_PATH,
     APPLICATION_AUTHORS_EMAIL,
     APPLICATION_DEPLOYMENT_ENVIRONMENT,
     APPLICATION_NAME,
@@ -75,7 +74,6 @@ class AgentContainer(AgentDI):
             app_version=APPLICATION_VERSION,
             app_deployment_environment=APPLICATION_DEPLOYMENT_ENVIRONMENT,
             app_authors=APPLICATION_AUTHORS_EMAIL,
-            app_api_root_path=APPLICATION_API_ROOT_PATH,
         ).router
 
     @property

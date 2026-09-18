@@ -15,14 +15,12 @@ class ActuatorRouter:
         app_name: str,
         app_version: str,
         app_deployment_environment: str,
-        app_api_root_path: str,
         app_authors: str,
     ) -> None:
         self._app_name = app_name
         self._app_version = app_version
         self._app_deployment_environment = app_deployment_environment
         self._app_authors = app_authors
-        self._app_root_path = app_api_root_path
 
         self._router = APIRouter(prefix=self.PREFIX, tags=["actuator"])
         self._router_register()
@@ -63,6 +61,5 @@ class ActuatorRouter:
             name=self._app_name,
             version=self._app_version,
             environment=self._app_deployment_environment,
-            api_root_path=self._app_root_path,
             authors=self._app_authors,
         )

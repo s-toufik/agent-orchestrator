@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Mapping
 from functools import cached_property
 from typing import Any
@@ -5,6 +6,7 @@ from typing import Any
 import aiosqlite
 from httpx import AsyncClient
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.mongodb import MongoDBSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pycraftcore.application_configuration.enum import ConnectorType
 from pycraftcore.application_configuration.model.connector import (
@@ -16,11 +18,17 @@ from pycraftcore.application_configuration.model.operation import ApiOperation
 from pycraftcore.circuit_breaker.configuration import CircuitBreakerSettings
 from pycraftcore.http.configuration import HttpClientSettings, LimitsSettings
 from pycraftcore.http.policy.http_error_policy import is_business_error, is_retryable
-from pycraftcore.repository.adapter import SQLiteRepositoryFactory, SqliteSettingsMapper
+from pycraftcore.repository.adapter import (
+    MongoRepositoryFactory,
+    MongoSettingsMapper,
+    SqliteRepositoryFactory,
+    SqliteSettingsMapper,
+)
 from pycraftcore.repository.port import AsyncRepositoryFactory
 from pycraftcore.resilient_http.adapter import ResilientTransportFactory
 from pycraftcore.resilient_http.configuration import ResilientHttpSettings
 from pycraftcore.retry.configuration import RetrySettings
+from pymongo import MongoClient
 
 from agent_orchestrator.adapter.outbound.langgraph.build_agent import build_agent
 from agent_orchestrator.adapter.outbound.llm.factory import LLMChat
@@ -36,17 +44,12 @@ from agent_orchestrator.application.use_case.stream_agent_usecase import on_toke
 from bootstrap.di.base_di import BaseDI
 
 MCP_CONNECTOR_NAME: str = "toolbox"
-# Any connector under `connector.mcp.*` whose name starts with this prefix is
-# discovered alongside the toolbox and merged into the same tool catalogue --
-# no code change needed to add one, just a new entry in connector/mcp.yml.
 EXTERNAL_MCP_PREFIX: str = "external_mcp_"
 
-MODEL_ALIASES: dict[str, str] = {
-    "gpt-oss-20b": "gpt_oss_20b",
-    "mistralai/ministral-3-14b-reasoning": "ministral_3_14b_reasoning",
-    "mistralai/ministral-3-3b": "ministral_3_3b",
-    "qwen/qwen3-1.7b": "qwen_3_1p7b",
-}
+SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
+MONGODB_CHECKPOINTER: str = "mongodb_checkpointer"
+
+MODEL_ALIASES: dict[str, str] = {"granite4-7b": "granite4-7b"}
 
 
 class AgentDI(BaseDI):
@@ -63,15 +66,11 @@ class AgentDI(BaseDI):
         }
 
     async def _close_mcp_session_factories(self) -> None:
-        factories = self.__dict__.pop("_mcp_session_factories", None)
-        if factories is not None:
-            for factory in factories.values():
-                await factory.close()
+        self.__dict__.pop("_mcp_session_factories", None)
 
     async def _tool_registry(self) -> ToolRegistryPort:
         tools: list[ToolPort] = []
         for name, factory in self._mcp_session_factories.items():
-            await factory.start()
             discovered: list[ToolPort] = await McpToolProvider(factory).tools()
             self._logging.info(
                 f"Discovered {len(discovered)} MCP tools from '{name}': "
@@ -132,15 +131,51 @@ class AgentDI(BaseDI):
         return LLMChat(connector, parameters, self._llm_http_client).create_chat_client()
 
     # ------------------------------------------------------------------ graph
-    async def _checkpointer(self) -> AsyncSqliteSaver:
-        connection: aiosqlite.Connection = await self._sqlite_connection("checkpointer")
+    async def _checkpointer(self) -> AsyncSqliteSaver | MongoDBSaver:
+        mongo_saver: MongoDBSaver | None = await self._mongodb_checkpointer()
+        if mongo_saver is not None:
+            self._logging.info("Using MongoDB checkpointer with TTL")
+            return mongo_saver
+
+        self._logging.info("Using Sqlite checkpointer with no TTL")
+        return await self._sqlite_checkpointer()
+
+    async def _sqlite_checkpointer(self) -> AsyncSqliteSaver:
+        connection: aiosqlite.Connection = await self._sqlite_connection(SQLITE_CHECKPOINTER)
         return AsyncSqliteSaver(connection)
 
+    async def _mongodb_checkpointer(self) -> MongoDBSaver | None:
+        if client := await self._mongo_connection(MONGODB_CHECKPOINTER):
+            connector: DatabaseConnector = self._database_connector(MONGODB_CHECKPOINTER)
+            return await asyncio.to_thread(
+                MongoDBSaver,
+                client,
+                db_name=connector.default_name,
+                ttl=connector.pool.get("ttl", 3600),
+            )
+        else:
+            return None
+
+    def _database_connector(self, connector_name: str) -> DatabaseConnector:
+        return self._configuration.connector.database(connector_name)
+
     async def _sqlite_connection(self, connector_name: str) -> aiosqlite.Connection:
-        connector: DatabaseConnector = self._configuration.connector.database(connector_name)
-        factory: AsyncRepositoryFactory = SQLiteRepositoryFactory(SqliteSettingsMapper(connector)())
+        connector = self._database_connector(connector_name)
+        factory: AsyncRepositoryFactory = SqliteRepositoryFactory(SqliteSettingsMapper(connector)())
         self._register_repository(factory)
         return await factory.connection()
+
+    async def _mongo_connection(self, connector_name: str) -> MongoClient | None:
+        connector = self._database_connector(connector_name)
+        factory: AsyncRepositoryFactory = MongoRepositoryFactory(MongoSettingsMapper(connector)())
+        self._register_repository(factory)
+        try:
+            await factory.ping()
+            return await factory.connection()
+        except Exception as exception:
+            self._logging.warning(f"MongoDB checkpointer unavailable: {exception}")
+            await factory.disconnect()
+            return None
 
     def _build_graph(
         self, model_name: str, checkpointer: Any, tool_registry: ToolRegistryPort

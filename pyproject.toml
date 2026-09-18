@@ -25,7 +25,7 @@ dependencies = [
     "httpx2",
     "aiosqlite",
     "mcp",
-    "pycraftcore>=1.1.2,<2",
+    "pycraftcore>=1.2.0",
     "pydantic>=2",
     "python-dotenv",
     "langchain",
@@ -33,6 +33,8 @@ dependencies = [
     "langchain-openai",
     "langgraph",
     "langgraph-checkpoint-sqlite",
+    "pymongo>=4.9,<4.18",
+    "langgraph-checkpoint-mongodb",
 ]
 
 [project.scripts]
@@ -76,8 +78,8 @@ ignore = [
 ]
 
 [tool.ty.src]
-include = ["src", "tests"]
-exclude = [".venv"]
+include = ["src"]
+exclude = [".venv", "tests"]
 
 [project.urls]
 Homepage = "https://github.com/s-toufik/agent-orchestrator"

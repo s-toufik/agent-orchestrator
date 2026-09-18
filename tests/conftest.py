@@ -42,6 +42,30 @@ def anyio_backend() -> Any:
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def _fake_mongo_client(monkeypatch):
+    """No real MongoDB is available in tests. AgentDI._checkpointer() tries a
+    MongoDB checkpointer first and falls back to sqlite on any connection
+    failure (see AgentDI._mongo_connection) -- fake the client so that
+    fallback path is exercised for real, without a real (and slow, and
+    environment-dependent) network connection attempt.
+    """
+    from pycraftcore.repository.adapter.no_sql.mongodb import factory as mongo_factory
+
+    class _UnreachableMongoClient:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        @property
+        def admin(self):
+            raise ConnectionError("no MongoDB available in tests")
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(mongo_factory, "MongoClient", _UnreachableMongoClient)
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _isolate_global_tracer_provider():
     """Neutralize the process-wide OpenTelemetry tracer-provider singleton for

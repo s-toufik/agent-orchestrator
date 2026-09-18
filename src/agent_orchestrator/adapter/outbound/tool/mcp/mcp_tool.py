@@ -1,3 +1,4 @@
+import traceback
 from typing import Any
 
 from mcp.types import CallToolResult, TextContent
@@ -21,14 +22,16 @@ class McpTool:
 
     async def invoke(self, invocation: ToolInvocation) -> ToolOutcome:
         try:
-            session = await self._session_factory.session()
-            result = await session.call_tool(self._specification.name, invocation.arguments)
+            async with self._session_factory.session() as session:
+                result: CallToolResult = await session.call_tool(
+                    self._specification.name, invocation.arguments
+                )
         except Exception as exception:
-            await self._session_factory.invalidate()
+            traceback_str: str = "".join(traceback.format_exception(exception))
             return ToolOutcome.failure(
                 invocation_id=invocation.id,
                 tool_name=self._specification.name,
-                error=f"MCP call failed: {exception}",
+                error=f"MCP call failed: {traceback_str}",
             )
 
         return self._to_outcome(invocation, result)

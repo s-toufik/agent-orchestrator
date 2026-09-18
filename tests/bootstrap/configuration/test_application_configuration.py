@@ -10,17 +10,20 @@ REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 
 def make_settings(directory: Path, role: str = "agent-orchestrator") -> ProcessSettings:
-    return ProcessSettings(
-        role=role, environment="debug", configuration_directory=directory, host="0.0.0.0", port=8000
-    )
+    return ProcessSettings(role=role, environment="debug", configuration_directory=directory)
 
 
 def _set_required_env(monkeypatch) -> None:
     # The real config tree interpolates these with no default -- they must be
     # present for OmegaConf to resolve it at all, even though this test only
     # cares about the mcp/operation values, not the database ones.
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", "/tmp")
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", "/tmp")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "test-checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
 
 
 def test_loads_the_real_configuration_tree(logger, monkeypatch) -> None:
@@ -29,8 +32,8 @@ def test_loads_the_real_configuration_tree(logger, monkeypatch) -> None:
     configuration = SetApplicationConfiguration(make_settings(REAL_CONFIG_DIR), logger)()
 
     assert configuration.connector.mcp("toolbox").transport == "streamable_http"
-    assert configuration.connector.database("checkpointer").engine == "sqlite"
-    assert configuration.operation.api("gpt_oss_20b").name == "gpt-oss-20b"
+    assert configuration.connector.database("sqlite_checkpointer").engine == "sqlite"
+    assert configuration.connector.database("mongodb_checkpointer").engine == "mongodb"
 
 
 def test_raises_when_the_configuration_directory_does_not_exist(logger, tmp_path) -> None:

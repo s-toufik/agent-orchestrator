@@ -20,8 +20,13 @@ REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 def _base_env(monkeypatch, tmp_path):
     monkeypatch.setenv("USER_DB_HOST", str(tmp_path))
     monkeypatch.setenv("USER_DB_NAME", "users")
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", str(tmp_path))
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "checkpoint")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", str(tmp_path))
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
 
 
 def make_settings() -> ProcessSettings:
@@ -29,8 +34,6 @@ def make_settings() -> ProcessSettings:
         role="agent-orchestrator",
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
-        host="0.0.0.0",
-        port=8000,
     )
 
 
@@ -77,13 +80,7 @@ def test_is_not_ready_before_boot() -> None:
     assert container.is_ready is False
 
 
-def test_logging_and_application_configuration_expose_the_di_internals(
-    monkeypatch, tmp_path
-) -> None:
-    monkeypatch.setenv("USER_DB_HOST", str(tmp_path))
-    monkeypatch.setenv("USER_DB_NAME", "users")
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", str(tmp_path))
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "checkpoint")
+def test_logging_and_application_configuration_expose_the_di_internals() -> None:
     container = AgentContainer(make_settings())
 
     assert container.logging is container._logging

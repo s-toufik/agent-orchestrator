@@ -37,6 +37,9 @@ class StreamAgentController:
     async def execute(self, request: AgentRequestSchema) -> StreamingResponse:
         request_id: str = request.request_id or request_id_context.get() or "N/A"
 
+        if request.request_id:
+            request_id_context.set(request.request_id)
+
         if self._admission.locked():
             self._logger.warning(f"[{request_id}] rejected: server at capacity")
             raise HTTPException(status_code=503, detail="Server is at capacity, please retry.")

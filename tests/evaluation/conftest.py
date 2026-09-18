@@ -46,25 +46,28 @@ EVAL_MODEL: str = os.getenv("EVAL_MODEL", "gpt_oss_20b")
 RunAgent = Callable[[str], Awaitable[tuple[AgentMessage, AgentState]]]
 
 
-def _settings(role: str, port: int) -> ProcessSettings:
+def _settings(role: str) -> ProcessSettings:
     return ProcessSettings(
         role=role,
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
-        host="0.0.0.0",
-        port=port,
     )
 
 
 @pytest.fixture
 def _base_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("CHECKPOINT_DB_HOST", str(tmp_path))
-    monkeypatch.setenv("CHECKPOINT_DB_NAME", "checkpoint")
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", str(tmp_path))
+    monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
+    monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
 
 
 @pytest.fixture
 async def agent_di(_base_env) -> AsyncIterator[AgentDI]:
-    di = AgentDI(_settings("agent-orchestrator", 8000))
+    di = AgentDI(_settings("agent-orchestrator"))
     try:
         yield di
     finally:

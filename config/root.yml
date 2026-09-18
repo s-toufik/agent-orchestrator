@@ -4,16 +4,14 @@ application_configuration:
 
   connector:
     api:
-      llm: ${connector.llm}
+      llm: ${connector.llm_provider}
     database:
-      checkpointer: ${connector.checkpointer}
+      mongodb_checkpointer: ${connector.mongodb_checkpointer}
+      sqlite_checkpointer: ${connector.sqlite_checkpointer}
     telemetry:
       open_telemetry: ${connector.telemetry}
     mcp:
       toolbox: ${connector.toolbox}
 
   operation:
-    gpt_oss_20b: ${operation.gpt_oss_20b}
-    ministral_3_14b_reasoning: ${operation.ministral_3_14b_reasoning}
-    ministral_3_3b: ${operation.ministral_3_3b}
-    qwen_3_1p7b: ${operation.qwen_3_1p7b}
+    granite4-7b: ${operation.granite4-7b}

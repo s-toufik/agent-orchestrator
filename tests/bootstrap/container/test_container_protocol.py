@@ -12,8 +12,6 @@ def test_agent_container_satisfies_the_container_protocol() -> None:
         role="agent-orchestrator",
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
-        host="0.0.0.0",
-        port=8000,
     )
 
     assert isinstance(AgentContainer(settings), Container)

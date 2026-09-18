@@ -1,4 +1,4 @@
-from mcp import ClientSession
+from mcp import ListToolsResult
 
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_session_factory import McpSessionFactory
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool import McpTool
@@ -13,8 +13,8 @@ class McpToolProvider:
         self._required = required
 
     async def tools(self) -> list[ToolPort]:
-        session: ClientSession = await self._session_factory.session()
-        response = await session.list_tools()
+        async with self._session_factory.session() as session:
+            response: ListToolsResult = await session.list_tools()
 
         tools: list[ToolPort] = [
             McpTool(

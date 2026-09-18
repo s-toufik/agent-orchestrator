@@ -11,5 +11,4 @@ class InfoSchema(BaseModel):
     name: str
     version: str
     environment: str
-    api_root_path: str
     authors: str

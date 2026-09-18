@@ -10,7 +10,6 @@ def make_app(ready: bool | None = None) -> FastAPI:
         app_name="agent-orchestrator",
         app_version="1.2.3",
         app_deployment_environment="debug",
-        app_api_root_path="/",
         app_authors="dev@example.com",
     )
     app.include_router(router.router)
@@ -64,6 +63,5 @@ def test_info_reports_the_constructor_fields() -> None:
         "name": "agent-orchestrator",
         "version": "1.2.3",
         "environment": "debug",
-        "api_root_path": "/",
         "authors": "dev@example.com",
     }

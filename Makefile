@@ -16,7 +16,7 @@ endif
 	uv sync
 
 test:
-	uv run pytest -n auto --disable-warnings
+	uv run pytest --disable-warnings
 
 evaluation:
 	pytest -m evaluation tests/evaluation

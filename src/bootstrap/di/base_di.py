@@ -1,10 +1,12 @@
 import asyncio
+import logging
 from functools import cached_property
 
 from pycraftcore.application_configuration import ApplicationConfiguration
+from pycraftcore.application_configuration.model.connector import TelemetryConnector
 from pycraftcore.http.port import AsyncHttpFactory
 from pycraftcore.logger.adapter import LoguruLogger
-from pycraftcore.logger.port import Logger
+from pycraftcore.logger.port import Logger, LogSink
 from pycraftcore.repository.port import AsyncRepositoryFactory
 from pycraftcore.telemetry.adapter import OpenTelemetryProvider
 from pycraftcore.telemetry.port import TelemetryProvider
@@ -30,10 +32,20 @@ class BaseDI:
 
     @cached_property
     def _telemetry_provider(self) -> TelemetryProvider:
-        return OpenTelemetryProvider(
+        connector: TelemetryConnector = self._configuration.connector.telemetry("open_telemetry")
+        provider = OpenTelemetryProvider(
             service_name=f"{self._settings.role}-service",
             environment=self._configuration.env,
+            otlp_endpoint=f"{connector.host}:{connector.port}",
         )
+        log_handler = provider.log_handler()
+        if isinstance(self._logging, LogSink):
+            self._logging.attach(log_handler)
+        # loguru is a separate system from stdlib logging: attaching only to it
+        # misses everything third-party libraries (mcp, uvicorn, starlette, ...)
+        # log via logging.getLogger(__name__). Attach at the root so it's caught too.
+        logging.getLogger().addHandler(log_handler)
+        return provider
 
     def _register_client(self, client: AsyncHttpFactory) -> AsyncHttpFactory:
         self._clients.append(client)
