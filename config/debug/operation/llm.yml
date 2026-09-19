@@ -1,14 +1,140 @@
 operation:
-  granite4-7b:
-    name: granite4-7b
+  qwen3-8b:
+    name: qwen3-8b
     connector: ${connector.llm_provider}
     type: api
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: ${operation.granite4-7b.name}
+      model: ${operation.qwen3-8b.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  ministral-8b-instruct-2410:
+    name: ministral-8b-instruct-2410
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.ministral-8b-instruct-2410.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  lfm2-8b-a1b:
+    name: lfm2-8b-a1b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.lfm2-8b-a1b.name}
       temperature: 0.0
       max_output_tokens: 8000
-      max_context_tokens: 8000
+      max_context_tokens: 22000
+      max_iterations: 20
+      use_streaming: true
+
+  qwen3-14b:
+    name: qwen3-14b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.qwen3-14b.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  gpt-oss-20b:
+    name: gpt-oss-20b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.gpt-oss-20b.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  lfm2-24b-a2b:
+    name: lfm2-24b-a2b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.lfm2-24b-a2b.name}
+      temperature: 0.0
+      max_output_tokens: 8000
+      max_context_tokens: 22000
+      max_iterations: 20
+      use_streaming: true
+
+  mistral-small-3-2-24b-instruct:
+    name: mistral-small-3-2-24b-instruct
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.mistral-small-3-2-24b-instruct.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  gemma4-26b-a4b:
+    name: gemma4-26b-a4b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.gemma4-26b-a4b.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 200000
+      max_iterations: 20
+      use_streaming: true
+
+  qwen3-30b-a3b-instruct-2507:
+    name: qwen3-30b-a3b-instruct-2507
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.qwen3-30b-a3b-instruct-2507.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
+      max_iterations: 20
+      use_streaming: true
+
+  qwen3-32b:
+    name: qwen3-32b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.qwen3-32b.name}
+      temperature: 0.0
+      max_output_tokens: 30000
+      max_context_tokens: 96000
       max_iterations: 20
       use_streaming: true
