@@ -31,6 +31,7 @@ def test_pack_then_unpack_round_trips_a_full_state() -> None:
         reflection=ReflectionDecision(action=ReflectionAction.ACCEPT, critique="ok"),
         last_node="final",
         session_id="s1",
+        question="what is 2+2?",
         iteration=2,
         max_iterations=10,
         final_answer="the answer",
@@ -40,6 +41,7 @@ def test_pack_then_unpack_round_trips_a_full_state() -> None:
 
     assert restored.session_id == "s1"
     assert restored.last_node == "final"
+    assert restored.question == "what is 2+2?"
     assert restored.iteration == 2
     assert restored.max_iterations == 10
     assert restored.final_answer == "the answer"
@@ -56,6 +58,7 @@ def test_unpack_state_applies_defaults_for_a_brand_new_thread() -> None:
     assert restored.reflection is None
     assert restored.last_node == ""
     assert restored.session_id == ""
+    assert restored.question == ""
     assert restored.iteration == 0
     assert restored.max_iterations == 20
     assert restored.final_answer is None

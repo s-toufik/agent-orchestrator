@@ -20,7 +20,6 @@ from agent_orchestrator.domain.model.agent_request import AgentRequest
 
 
 class LangAgent:
-    """LangGraph-backed implementation of AgentPort."""
 
     def __init__(self, graphs: dict[str, Any]) -> None:
         self._graphs = graphs

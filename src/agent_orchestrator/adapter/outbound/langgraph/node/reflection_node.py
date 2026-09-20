@@ -37,7 +37,7 @@ class ReflectionNode(Node):
                 )
             ),
             HumanMessage(
-                content=f"User question is:\n\n {question} Assistant answer is: \n\n{answer}"
+                content=f"User question is:\n {question} \n\nAssistant answer is: \n{answer}"
             ),
         ]
         self._logger.debug("Calling reflection LLM")
