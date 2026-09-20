@@ -2,6 +2,7 @@ from typing import Any, cast
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from pycraftcore.logger.port import Logger
 
 from agent_orchestrator.adapter.outbound.langgraph.node.node import Node
 from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
@@ -16,9 +17,10 @@ from agent_orchestrator.adapter.outbound.langgraph.service.prompt_service import
 
 
 class ReflectionNode(Node):
-    def __init__(self, llm: BaseChatModel, prompt_service: PromptService) -> None:
+    def __init__(self, llm: BaseChatModel, prompt_service: PromptService, logger: Logger) -> None:
         self._llm = llm
         self._prompt_service = prompt_service
+        self._logger = logger
 
     async def __call__(self, state: GraphState) -> GraphState:
         agent_state: AgentState = self._unpack(state)
@@ -38,7 +40,8 @@ class ReflectionNode(Node):
                 content=f"User question is:\n\n {question} Assistant answer is: \n\n{answer}"
             ),
         ]
-
+        self._logger.debug("Calling reflection LLM")
+        self._logger.debug(f"Reflection messages: {messages}")
         raw: dict[str, Any] = cast(
             dict[str, Any],
             await self._llm.with_structured_output(ReflectionDecision, include_raw=True).ainvoke(

@@ -41,14 +41,14 @@ class FakeLLM:
         return FakeStructuredRunnable(self._result, self.sent_messages)
 
 
-def _node(llm: FakeLLM) -> ReflectionNode:
-    return ReflectionNode(cast(BaseChatModel, llm), PromptService())
+def _node(llm: FakeLLM, logger) -> ReflectionNode:
+    return ReflectionNode(cast(BaseChatModel, llm), PromptService(), logger)
 
 
-async def test_a_parsed_decision_is_stored_on_the_state() -> None:
+async def test_a_parsed_decision_is_stored_on_the_state(logger) -> None:
     decision = ReflectionDecision(action=ReflectionAction.RETRY, critique="missing detail")
     llm = FakeLLM({"parsed": decision, "raw": None, "parsing_error": None})
-    node = _node(llm)
+    node = _node(llm, logger)
     state = AgentState(
         conversation=Conversation([ConversationMessage(role=Role.ASSISTANT, content="the answer")])
     )
@@ -59,9 +59,9 @@ async def test_a_parsed_decision_is_stored_on_the_state() -> None:
     assert result.last_node == "reflection"
 
 
-async def test_a_failed_parse_leaves_reflection_none() -> None:
+async def test_a_failed_parse_leaves_reflection_none(logger) -> None:
     llm = FakeLLM({"parsed": None, "raw": None, "parsing_error": ValueError("bad json")})
-    node = _node(llm)
+    node = _node(llm, logger)
     state = AgentState(
         conversation=Conversation([ConversationMessage(role=Role.ASSISTANT, content="x")])
     )
@@ -71,9 +71,9 @@ async def test_a_failed_parse_leaves_reflection_none() -> None:
     assert result.reflection is None
 
 
-async def test_uses_a_placeholder_when_there_is_no_assistant_answer_yet() -> None:
+async def test_uses_a_placeholder_when_there_is_no_assistant_answer_yet(logger) -> None:
     llm = FakeLLM({"parsed": None})
-    node = _node(llm)
+    node = _node(llm, logger)
 
     await node(pack_state(AgentState()))
 
@@ -81,9 +81,9 @@ async def test_uses_a_placeholder_when_there_is_no_assistant_answer_yet() -> Non
     assert "(no assistant answer found)" in str(sent[-1].content)
 
 
-async def test_the_assistant_answer_is_embedded_in_the_evaluation_prompt() -> None:
+async def test_the_assistant_answer_is_embedded_in_the_evaluation_prompt(logger) -> None:
     llm = FakeLLM({"parsed": None})
-    node = _node(llm)
+    node = _node(llm, logger)
     state = AgentState(
         conversation=Conversation([ConversationMessage(role=Role.ASSISTANT, content="42 users")])
     )

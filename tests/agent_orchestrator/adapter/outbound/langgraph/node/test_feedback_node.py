@@ -15,10 +15,9 @@ from agent_orchestrator.adapter.outbound.langgraph.service.state_serialization i
     unpack_state,
 )
 
-node = FeedbackNode(PromptService())
 
-
-async def test_appends_the_critique_as_a_user_message() -> None:
+async def test_appends_the_critique_as_a_user_message(logger) -> None:
+    node = FeedbackNode(PromptService(), logger)
     state = AgentState(
         reflection=ReflectionDecision(action=ReflectionAction.RETRY, critique="too vague")
     )
@@ -32,7 +31,8 @@ async def test_appends_the_critique_as_a_user_message() -> None:
     assert result.last_node == "feedback"
 
 
-async def test_restates_the_question_and_prior_answer_for_the_retry() -> None:
+async def test_restates_the_question_and_prior_answer_for_the_retry(logger) -> None:
+    node = FeedbackNode(PromptService(), logger)
     state = AgentState(
         conversation=Conversation(
             [
@@ -52,7 +52,8 @@ async def test_restates_the_question_and_prior_answer_for_the_retry() -> None:
     assert "too vague" in last.content
 
 
-async def test_uses_a_default_message_when_there_is_no_reflection() -> None:
+async def test_uses_a_default_message_when_there_is_no_reflection(logger) -> None:
+    node = FeedbackNode(PromptService(), logger)
     state = AgentState(reflection=None)
 
     result = unpack_state(await node(pack_state(state)))

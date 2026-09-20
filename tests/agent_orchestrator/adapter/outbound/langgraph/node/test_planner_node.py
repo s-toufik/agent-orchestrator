@@ -54,13 +54,13 @@ class StubRegistry:
         raise AssertionError("not expected to be called from PlannerNode")
 
 
-def _node(llm: FakeLLM, **kwargs: Any) -> PlannerNode:
-    return PlannerNode(cast(BaseChatModel, llm), StubRegistry(), PromptService(), **kwargs)
+def _node(llm: FakeLLM, logger, **kwargs: Any) -> PlannerNode:
+    return PlannerNode(cast(BaseChatModel, llm), StubRegistry(), PromptService(), logger, **kwargs)
 
 
-async def test_a_plain_answer_with_no_tool_calls_becomes_the_final_answer() -> None:
+async def test_a_plain_answer_with_no_tool_calls_becomes_the_final_answer(logger) -> None:
     llm = FakeLLM(FakeBoundLLM(response=FakeAIMessage(content="the answer")))
-    node = _node(llm)
+    node = _node(llm, logger)
 
     result = unpack_state(await node(pack_state(AgentState())))
 
@@ -74,10 +74,10 @@ async def test_a_plain_answer_with_no_tool_calls_becomes_the_final_answer() -> N
     assert last.role is Role.ASSISTANT
 
 
-async def test_a_tool_call_response_has_no_answer_and_generates_call_ids() -> None:
+async def test_a_tool_call_response_has_no_answer_and_generates_call_ids(logger) -> None:
     raw_call = {"name": "run_sql", "args": {"query": "select 1"}}
     llm = FakeLLM(FakeBoundLLM(response=FakeAIMessage(content="", tool_calls=[raw_call])))
-    node = _node(llm)
+    node = _node(llm, logger)
 
     result = unpack_state(await node(pack_state(AgentState())))
 
@@ -90,9 +90,9 @@ async def test_a_tool_call_response_has_no_answer_and_generates_call_ids() -> No
     assert call.id.startswith("call_")
 
 
-async def test_tools_are_bound_from_the_registry_specifications() -> None:
+async def test_tools_are_bound_from_the_registry_specifications(logger) -> None:
     llm = FakeLLM(FakeBoundLLM(response=FakeAIMessage(content="ok")))
-    node = _node(llm)
+    node = _node(llm, logger)
 
     await node(pack_state(AgentState()))
 
@@ -101,7 +101,7 @@ async def test_tools_are_bound_from_the_registry_specifications() -> None:
     ]
 
 
-async def test_streaming_calls_on_token_per_chunk_and_accumulates_the_final_content() -> None:
+async def test_streaming_calls_on_token_per_chunk_and_accumulates_the_final_content(logger) -> None:
     chunks = [AIMessageChunk(content="Hel"), AIMessageChunk(content="lo")]
     llm = FakeLLM(FakeBoundLLM(chunks=chunks))
     received: list[str] = []
@@ -109,7 +109,7 @@ async def test_streaming_calls_on_token_per_chunk_and_accumulates_the_final_cont
     async def on_token(value: str) -> None:
         received.append(value)
 
-    node = _node(llm, on_token=on_token)
+    node = _node(llm, logger, on_token=on_token)
 
     result = unpack_state(await node(pack_state(AgentState())))
 
@@ -118,7 +118,7 @@ async def test_streaming_calls_on_token_per_chunk_and_accumulates_the_final_cont
     assert result.planner.answer == "Hello"
 
 
-async def test_streaming_skips_on_token_for_empty_chunks() -> None:
+async def test_streaming_skips_on_token_for_empty_chunks(logger) -> None:
     chunks = [AIMessageChunk(content=""), AIMessageChunk(content="hi")]
     llm = FakeLLM(FakeBoundLLM(chunks=chunks))
     received: list[str] = []
@@ -126,7 +126,7 @@ async def test_streaming_skips_on_token_for_empty_chunks() -> None:
     async def on_token(value: str) -> None:
         received.append(value)
 
-    node = _node(llm, on_token=on_token)
+    node = _node(llm, logger, on_token=on_token)
 
     await node(pack_state(AgentState()))
 

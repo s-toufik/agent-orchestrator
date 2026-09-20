@@ -4,6 +4,7 @@ from typing import cast
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, SystemMessage
+from pycraftcore.logger.port import Logger
 
 from agent_orchestrator.adapter.outbound.langgraph.enum.role import Role
 from agent_orchestrator.adapter.outbound.langgraph.node.node import Node
@@ -25,12 +26,14 @@ class PlannerNode(Node):
         llm: BaseChatModel,
         tool_registry: ToolRegistryPort,
         prompt_service: PromptService,
+        logger: Logger,
         on_token: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._llm = llm
         self._tool_registry = tool_registry
         self._prompt_service = prompt_service
         self._on_token = on_token
+        self._logger = logger
 
     async def __call__(self, state: GraphState) -> GraphState:
         agent_state: AgentState = self._unpack(state)
@@ -39,7 +42,8 @@ class PlannerNode(Node):
             SystemMessage(content=self._prompt_service.planner_system_prompt()),
             *agent_state.conversation.to_langchain(),
         ]
-
+        self._logger.debug("Calling planner LLM")
+        self._logger.debug(f"Planner messages: {messages}")
         bound_llm = self._llm.bind_tools(to_langchain_tools(self._tool_registry.specifications()))
         raw: AIMessage | AIMessageChunk = (
             await self._stream(bound_llm, messages, self._on_token)

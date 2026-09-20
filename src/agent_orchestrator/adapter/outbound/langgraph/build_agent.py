@@ -35,13 +35,14 @@ def build_agent(
             llm=planner_llm,
             tool_registry=tool_registry,
             prompt_service=PromptService(),
+            logger=logger,
             on_token=on_token if use_streaming else None,
         ),
         router=RouterNode(),
         executor=ExecutorNode(tool_registry, logger),
         memory=MemoryNode(max_context_tokens=model_parameters.max_context_tokens),
-        reflection=ReflectionNode(reflection_llm, PromptService()),
-        feedback=FeedbackNode(PromptService()),
+        reflection=ReflectionNode(reflection_llm, PromptService(), logger),
+        feedback=FeedbackNode(PromptService(), logger),
         final=FinalNode(),
     ).build(checkpointer=checkpointer)
 
