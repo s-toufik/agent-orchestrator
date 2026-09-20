@@ -23,4 +23,3 @@ application_configuration:
     mistral-small-3-2-24b-instruct: ${operation.mistral-small-3-2-24b-instruct}
     gemma4-26b-a4b: ${operation.gemma4-26b-a4b}
     qwen3-30b-a3b-instruct-2507: ${operation.qwen3-30b-a3b-instruct-2507}
-    qwen3-32b: ${operation.qwen3-32b}

@@ -124,17 +124,3 @@ operation:
       max_context_tokens: 96000
       max_iterations: 20
       use_streaming: true
-
-  qwen3-32b:
-    name: qwen3-32b
-    connector: ${connector.llm_provider}
-    type: api
-    endpoint: /chat/completions
-    method: POST
-    parameters:
-      model: ${operation.qwen3-32b.name}
-      temperature: 0.0
-      max_output_tokens: 30000
-      max_context_tokens: 96000
-      max_iterations: 20
-      use_streaming: true
