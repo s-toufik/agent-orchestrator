@@ -50,10 +50,18 @@ completeness problem, with a short, concrete critique."""
     _REFLECTION_OUTPUT = "Return only this JSON, nothing else:\n{output_format}"
 
     # -------------------------------------------------------------- feedback
-    _FEEDBACK_TEMPLATE = """You are retrying a previous answer. Fix only this:
-{critiques}
+    _FEEDBACK_TEMPLATE = """You are retrying a previous answer.
 
-Do not repeat reasoning that was already correct."""
+User question is:
+{question}
+
+Assistant answer is:
+{answer}
+
+Judge critique is:
+{critique}
+
+Fix only what the critique flags. Do not repeat reasoning that was already correct."""
 
     @staticmethod
     def _compose(*sections: str) -> str:
@@ -78,8 +86,10 @@ Do not repeat reasoning that was already correct."""
         )
 
     @staticmethod
-    def feedback_system_prompt(critique: str) -> str:
+    def feedback_system_prompt(question: str, answer: str, critique: str) -> str:
         return PromptService._compose(
             PromptService._STYLE,
-            PromptService._FEEDBACK_TEMPLATE.format(critiques=critique),
+            PromptService._FEEDBACK_TEMPLATE.format(
+                question=question, answer=answer, critique=critique
+            ),
         )

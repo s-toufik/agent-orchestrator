@@ -2,6 +2,10 @@ from agent_orchestrator.adapter.outbound.langgraph.enum.reflection_action import
 from agent_orchestrator.adapter.outbound.langgraph.enum.role import Role
 from agent_orchestrator.adapter.outbound.langgraph.node.feedback_node import FeedbackNode
 from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
+from agent_orchestrator.adapter.outbound.langgraph.schema.conversation import Conversation
+from agent_orchestrator.adapter.outbound.langgraph.schema.conversation_message import (
+    ConversationMessage,
+)
 from agent_orchestrator.adapter.outbound.langgraph.schema.reflection_decision import (
     ReflectionDecision,
 )
@@ -26,6 +30,26 @@ async def test_appends_the_critique_as_a_user_message() -> None:
     assert last.role is Role.USER
     assert "too vague" in last.content
     assert result.last_node == "feedback"
+
+
+async def test_restates_the_question_and_prior_answer_for_the_retry() -> None:
+    state = AgentState(
+        conversation=Conversation(
+            [
+                ConversationMessage(role=Role.USER, content="what is 2+2?"),
+                ConversationMessage(role=Role.ASSISTANT, content="3"),
+            ]
+        ),
+        reflection=ReflectionDecision(action=ReflectionAction.RETRY, critique="too vague"),
+    )
+
+    result = unpack_state(await node(pack_state(state)))
+
+    last = result.conversation.last()
+    assert last is not None
+    assert "what is 2+2?" in last.content
+    assert "3" in last.content
+    assert "too vague" in last.content
 
 
 async def test_uses_a_default_message_when_there_is_no_reflection() -> None:

@@ -19,3 +19,9 @@ class AgentState(BaseModel):
     iteration: int = 0
     max_iterations: int = 20
     final_answer: str | None = None
+
+    def current_question(self) -> str:
+        if self.question:
+            return self.question
+        first_user = self.conversation.first_user()
+        return first_user.content if first_user else "(no user question found)"

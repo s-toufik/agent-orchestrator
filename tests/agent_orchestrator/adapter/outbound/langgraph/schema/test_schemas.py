@@ -27,6 +27,33 @@ def test_agent_state_defaults() -> None:
     assert state.final_answer is None
 
 
+def test_current_question_prefers_the_question_field_over_conversation_history() -> None:
+    state = AgentState(
+        question="what about the second turn?",
+        conversation=Conversation(
+            [
+                ConversationMessage(role=Role.USER, content="first turn question"),
+                ConversationMessage(role=Role.ASSISTANT, content="first turn answer"),
+                ConversationMessage(role=Role.USER, content="what about the second turn?"),
+            ]
+        ),
+    )
+
+    assert state.current_question() == "what about the second turn?"
+
+
+def test_current_question_falls_back_to_first_user_message_when_unset() -> None:
+    state = AgentState(
+        conversation=Conversation([ConversationMessage(role=Role.USER, content="hi")])
+    )
+
+    assert state.current_question() == "hi"
+
+
+def test_current_question_has_a_placeholder_when_nothing_is_available() -> None:
+    assert AgentState().current_question() == "(no user question found)"
+
+
 def test_planner_decision_wants_tools_only_with_calls() -> None:
     assert PlannerDecision(tool_calls=[], answer="done").wants_tools is False
     call = ToolCall(id="1", name="t", args={})

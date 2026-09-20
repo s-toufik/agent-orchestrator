@@ -15,9 +15,11 @@ def test_reflection_system_prompt_embeds_the_output_format() -> None:
     assert '{"type": "object"}' in prompt
 
 
-def test_feedback_system_prompt_embeds_the_critique() -> None:
+def test_feedback_system_prompt_embeds_the_question_answer_and_critique() -> None:
     service = PromptService()
 
-    prompt = service.feedback_system_prompt("missing the total")
+    prompt = service.feedback_system_prompt("what is 2+2?", "3", "missing the total")
 
+    assert "what is 2+2?" in prompt
+    assert "3" in prompt
     assert "missing the total" in prompt

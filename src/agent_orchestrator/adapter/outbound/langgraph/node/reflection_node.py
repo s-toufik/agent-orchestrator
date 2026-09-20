@@ -26,12 +26,7 @@ class ReflectionNode(Node):
         last: ConversationMessage | None = agent_state.conversation.last_assistant()
         answer: str = last.content if last else "(no assistant answer found)"
 
-        question: str = agent_state.question
-        if question:
-            first_user_question: ConversationMessage | None = agent_state.conversation.first_user()
-            question: str = (
-                first_user_question.content if first_user_question else "(no user question found)"
-            )
+        question: str = agent_state.current_question()
 
         messages: list[BaseMessage] = [
             SystemMessage(

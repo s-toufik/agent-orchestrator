@@ -21,10 +21,14 @@ class FeedbackNode(Node):
             else "No specific critique provided."
         )
 
+        last_assistant: ConversationMessage | None = agent_state.conversation.last_assistant()
+        question: str = agent_state.current_question()
+        answer: str = last_assistant.content if last_assistant else "(no assistant answer found)"
+
         agent_state.conversation.append(
             ConversationMessage(
                 role=Role.USER,
-                content=self._prompt_service.feedback_system_prompt(critique),
+                content=self._prompt_service.feedback_system_prompt(question, answer, critique),
             )
         )
         agent_state.last_node = "feedback"
