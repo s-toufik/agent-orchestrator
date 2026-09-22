@@ -41,9 +41,6 @@ class BaseDI:
         log_handler = provider.log_handler()
         if isinstance(self._logging, LogSink):
             self._logging.attach(log_handler)
-        # loguru is a separate system from stdlib logging: attaching only to it
-        # misses everything third-party libraries (mcp, uvicorn, starlette, ...)
-        # log via logging.getLogger(__name__). Attach at the root so it's caught too.
         logging.getLogger().addHandler(log_handler)
         return provider
 

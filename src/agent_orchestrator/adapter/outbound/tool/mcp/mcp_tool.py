@@ -1,3 +1,4 @@
+import json
 import traceback
 from typing import Any
 
@@ -44,14 +45,26 @@ class McpTool:
                 error=f"Unsupported MCP result type: {type(result).__name__}",
             )
 
-        output = self._stringify(result.content)
         if result.is_error:
             return ToolOutcome.failure(
-                invocation_id=invocation.id, tool_name=self._specification.name, error=output
+                invocation_id=invocation.id,
+                tool_name=self._specification.name,
+                error=self._stringify(result.content),
             )
         return ToolOutcome(
-            invocation_id=invocation.id, tool_name=self._specification.name, output=output
+            invocation_id=invocation.id,
+            tool_name=self._specification.name,
+            output=self._render_output(result),
         )
+
+    @classmethod
+    def _render_output(cls, result: CallToolResult) -> str:
+        if result.structured_content is not None:
+            try:
+                return json.dumps(result.structured_content)
+            except TypeError, ValueError:
+                pass
+        return cls._stringify(result.content)
 
     @staticmethod
     def _stringify(content: list[Any]) -> str:
