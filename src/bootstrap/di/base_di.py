@@ -36,7 +36,9 @@ class BaseDI:
         provider = OpenTelemetryProvider(
             service_name=f"{self._settings.role}-service",
             environment=self._configuration.env,
-            otlp_endpoint=f"{connector.host}:{connector.port}",
+            otlp_endpoint=f"{connector.host}:{connector.port}"
+            if all([connector.host, connector.port])
+            else None,
         )
         log_handler = provider.log_handler()
         if isinstance(self._logging, LogSink):

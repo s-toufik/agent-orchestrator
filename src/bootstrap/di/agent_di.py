@@ -1,13 +1,9 @@
-import asyncio
 from collections.abc import Mapping
+from enum import StrEnum
 from functools import cached_property
-from typing import Any
 
 import aiosqlite
 from httpx import AsyncClient
-from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.mongodb import MongoDBSaver
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pycraftcore.application_configuration.enum import ConnectorType
 from pycraftcore.application_configuration.model.connector import (
     ApiConnector,
@@ -30,49 +26,55 @@ from pycraftcore.resilient_http.configuration import ResilientHttpSettings
 from pycraftcore.retry.configuration import RetrySettings
 from pymongo import MongoClient
 
-from agent_orchestrator.adapter.outbound.langgraph.build_agent import build_agent
-from agent_orchestrator.adapter.outbound.llm.factory import LLMChat
 from agent_orchestrator.adapter.outbound.llm.mapper import ModelSettingsMapper
 from agent_orchestrator.adapter.outbound.llm.schema import ModelConnector, ModelParameters
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool_provider import McpToolProvider
 from agent_orchestrator.adapter.outbound.tool.mcp.streamable_http_session_factory import (
     StreamableHttpSessionFactory,
 )
+from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort, ToolRegistryPort
 from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
-from agent_orchestrator.application.port.outbound.tool_port import ToolPort, ToolRegistryPort
-from agent_orchestrator.application.use_case.stream_agent_usecase import on_token
 from bootstrap.di.base_di import BaseDI
 
 MCP_CONNECTOR_NAME: str = "toolbox"
 EXTERNAL_MCP_PREFIX: str = "external_mcp_"
-
-SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
-MONGODB_CHECKPOINTER: str = "mongodb_checkpointer"
+LLM_CONNECTOR_NAME: str = "llm"
+MONGODB_CONNECTOR_NAME: str = "mongodb_checkpointer"
 
 MODEL_ALIASES: dict[str, str] = {
     "qwen3-8b": "qwen3-8b",
-    "ministral-8b-instruct-2410": "ministral-8b-instruct-2410",
+    "qwen3.5-0.8b": "qwen3_5-0_8b",
+    "qwen3-1.7b": "qwen3-1_7b",
+    "qwen3.5-2b": "qwen3_5-2b",
     "lfm2-8b-a1b": "lfm2-8b-a1b",
+    "ministral-8b-instruct-2410": "ministral-8b-instruct-2410",
+    "gigachat3.1-10b-a1.8b": "gigachat3_1-10b-a1_8b",
     "qwen3-14b": "qwen3-14b",
-    "gpt-oss-20b": "gpt-oss-20b",
-    "lfm2-24b-a2b": "lfm2-24b-a2b",
-    "mistral-small-3-2-24b-instruct": "mistral-small-3-2-24b-instruct",
-    "gemma4-26b-a4b": "gemma4-26b-a4b",
-    "qwen3-30b-a3b-instruct-2507": "qwen3-30b-a3b-instruct-2507",
 }
+
+
+class AgentRole(StrEnum):
+    CONTEXT = "agent_context"
+    PLAN = "agent_plan"
+    REFLECTION = "agent_reflection"
+    SUMMARY = "agent_summary"
 
 
 class AgentDI(BaseDI):
     # ------------------------------------------------------------------ tools
     @cached_property
-    def _mcp_session_factories(self) -> dict[str, StreamableHttpSessionFactory]:
+    def _mcp_connectors(self) -> dict[str, McpConnector]:
         connectors: Mapping[str, McpConnector] = self._configuration.connector[ConnectorType.mcp]
         names: list[str] = [MCP_CONNECTOR_NAME] + sorted(
             name for name in connectors if name.startswith(EXTERNAL_MCP_PREFIX)
         )
+        return {name: connectors[name] for name in names}
+
+    @cached_property
+    def _mcp_session_factories(self) -> dict[str, StreamableHttpSessionFactory]:
         return {
-            name: StreamableHttpSessionFactory(connector=connectors[name], logger=self._logging)
-            for name in names
+            name: StreamableHttpSessionFactory(connector=connector, logger=self._logging)
+            for name, connector in self._mcp_connectors.items()
         }
 
     async def _close_mcp_session_factories(self) -> None:
@@ -81,18 +83,30 @@ class AgentDI(BaseDI):
     async def _tool_registry(self) -> ToolRegistryPort:
         tools: list[ToolPort] = []
         for name, factory in self._mcp_session_factories.items():
-            discovered: list[ToolPort] = await McpToolProvider(factory).tools()
-            self._logging.info(
-                f"Discovered {len(discovered)} MCP tools from '{name}': "
-                f"{', '.join(tool.specification.name for tool in discovered)}"
-            )
-            tools.extend(discovered)
+            tools.extend(await self._discover_tools(name, factory))
+        if not tools:
+            self._logging.warning("No MCP tools available: the agent will answer without tools")
         return ToolRegistry(tools)
+
+    async def _discover_tools(
+        self, name: str, factory: StreamableHttpSessionFactory
+    ) -> list[ToolPort]:
+        # Tools are optional: a server that is down or advertises nothing is skipped.
+        try:
+            discovered: list[ToolPort] = await McpToolProvider(factory, required=False).tools()
+        except Exception as exception:
+            self._logging.warning(f"MCP server '{name}' unavailable, skipping it: {exception}")
+            return []
+        self._logging.info(
+            f"Discovered {len(discovered)} MCP tools from '{name}': "
+            f"{', '.join(tool.specification.name for tool in discovered)}"
+        )
+        return discovered
 
     # -------------------------------------------------------------------- llm
     @cached_property
     def _llm_transport_factory(self) -> ResilientTransportFactory:
-        connector: ApiConnector = self._configuration.connector.api("llm")
+        connector: ApiConnector = self._configuration.connector.api(LLM_CONNECTOR_NAME)
 
         http_settings = HttpClientSettings(limits=LimitsSettings(timeout=connector.timeout))
         http_settings.client_params.base_url = connector.base_url
@@ -134,38 +148,13 @@ class AgentDI(BaseDI):
         operation: ApiOperation = self._configuration.operation.api(model_name)
         return ModelSettingsMapper(operation)()
 
-    def _llm_for_model(self, model_name: str, use_streaming: bool | None = None) -> ChatOpenAI:
-        connector, parameters = self._model_settings(model_name)
-        if use_streaming is not None:
-            parameters.use_streaming = use_streaming
-        return LLMChat(connector, parameters, self._llm_http_client).create_chat_client()
-
-    # ------------------------------------------------------------------ graph
-    async def _checkpointer(self) -> AsyncSqliteSaver | MongoDBSaver:
-        mongo_saver: MongoDBSaver | None = await self._mongodb_checkpointer()
-        if mongo_saver is not None:
-            self._logging.info("Using MongoDB checkpointer with TTL")
-            return mongo_saver
-
-        self._logging.info("Using Sqlite checkpointer with no TTL")
-        return await self._sqlite_checkpointer()
-
-    async def _sqlite_checkpointer(self) -> AsyncSqliteSaver:
-        connection: aiosqlite.Connection = await self._sqlite_connection(SQLITE_CHECKPOINTER)
-        return AsyncSqliteSaver(connection)
-
-    async def _mongodb_checkpointer(self) -> MongoDBSaver | None:
-        if client := await self._mongo_connection(MONGODB_CHECKPOINTER):
-            connector: DatabaseConnector = self._database_connector(MONGODB_CHECKPOINTER)
-            return await asyncio.to_thread(
-                MongoDBSaver,
-                client,
-                db_name=connector.default_name,
-                ttl=connector.pool.get("ttl", 3600),
-            )
-        else:
+    def _role_settings(self, role: AgentRole) -> tuple[ModelConnector, ModelParameters] | None:
+        operation: ApiOperation = self._configuration.operation.api(role)
+        if operation.parameters.get("model") is None:
             return None
+        return ModelSettingsMapper(operation)()
 
+    # --------------------------------------------------------------- database
     def _database_connector(self, connector_name: str) -> DatabaseConnector:
         return self._configuration.connector.database(connector_name)
 
@@ -183,32 +172,6 @@ class AgentDI(BaseDI):
             await factory.ping()
             return await factory.connection()
         except Exception as exception:
-            self._logging.warning(f"MongoDB checkpointer unavailable: {exception}")
+            self._logging.warning(f"MongoDB '{connector_name}' unavailable: {exception}")
             await factory.disconnect()
             return None
-
-    def _build_graph(
-        self, model_name: str, checkpointer: Any, tool_registry: ToolRegistryPort
-    ) -> Any:
-        _, parameters = self._model_settings(model_name)
-
-        graph, _ = build_agent(
-            planner_llm=self._llm_for_model(model_name),
-            reflection_llm=self._llm_for_model(model_name, use_streaming=False),
-            tool_registry=tool_registry,
-            model_parameters=parameters,
-            logger=self._logging,
-            on_token=on_token,
-            checkpointer=checkpointer,
-        )
-        return graph
-
-    async def _build_graphs(self) -> tuple[dict[str, Any], Any]:
-        checkpointer = await self._checkpointer()
-        tool_registry: ToolRegistryPort = await self._tool_registry()
-
-        graphs: dict[str, Any] = {
-            alias: self._build_graph(operation_name, checkpointer, tool_registry)
-            for alias, operation_name in MODEL_ALIASES.items()
-        }
-        return graphs, checkpointer

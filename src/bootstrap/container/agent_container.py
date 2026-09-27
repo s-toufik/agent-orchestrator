@@ -8,13 +8,14 @@ from pycraftcore.logger.port import Logger
 from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
     StreamAgentController,
 )
-from agent_orchestrator.adapter.outbound.langgraph.lang_agent import LangAgent
 from agent_orchestrator.adapter.outbound.streaming.sse_queue import SSEQueue
 from agent_orchestrator.application.port.inbound.stream_agent_port import StreamAgentPort
 from agent_orchestrator.application.port.outbound.agent_port import AgentPort
-from agent_orchestrator.application.port.outbound.sse_queue_port import SSEQueuePort
+from agent_orchestrator.application.port.outbound.event_stream_port import EventStreamPort
 from agent_orchestrator.application.use_case.stream_agent_usecase import StreamAgentUseCase
-from bootstrap.di.agent_di import AgentDI
+from bootstrap.configuration.settings import AgentEngine
+from bootstrap.di.anthropic_sdk_di import AnthropicSdkDI
+from bootstrap.di.langgraph_di import LangGraphDI
 from bootstrap.router.actuator.actuator_router import ActuatorRouter
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
 from src import (
@@ -25,7 +26,7 @@ from src import (
 )
 
 
-class AgentContainer(AgentDI):
+class AgentContainer(LangGraphDI, AnthropicSdkDI):
     @property
     def logging(self) -> Logger:
         return self._logging
@@ -42,10 +43,11 @@ class AgentContainer(AgentDI):
         _ = self._llm_transport_factory
         await self._start_factories()
         await self._create_routers()
-        self.logging.info("Agent container booted")
+        self.logging.info(f"Agent container booted with the {self._settings.engine} engine")
 
     async def stop(self) -> None:
         await self._stop_factories()
+        await self._stop_anthropic_sdk()
         await self._close_llm_http_client()
         await self._close_mcp_session_factories()
         await self._shutdown_telemetry()
@@ -59,12 +61,23 @@ class AgentContainer(AgentDI):
         self._routers.append(await self._stream_agent_router())
         self._routers.append(self._actuator_router())
 
+    async def _agent(self) -> AgentPort:
+        match self._settings.engine:
+            case AgentEngine.LANGGRAPH:
+                return await self._langgraph_agent()
+            case AgentEngine.ANTHROPIC_SDK:
+                return await self._anthropic_sdk_agent()
+
     async def _stream_agent_router(self) -> APIRouter:
-        graphs, _ = await self._build_graphs()
-        agent: AgentPort = LangAgent(graphs)
+        agent: AgentPort = await self._agent()
         use_case: StreamAgentPort = StreamAgentUseCase(agent, self._logging)
-        sse_queue: Callable[[], SSEQueuePort] = SSEQueue
-        controller = StreamAgentController(use_case, sse_queue, self._logging)
+        events: Callable[[], EventStreamPort] = SSEQueue
+        controller = StreamAgentController(
+            use_case,
+            events,
+            self._logging,
+            max_concurrent_streams=self._settings.max_concurrent_streams,
+        )
         return StreamAgentRouter(controller).router
 
     @staticmethod
