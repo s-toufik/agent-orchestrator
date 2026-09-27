@@ -2,7 +2,7 @@ from mcp import ListToolsResult
 
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_session_factory import McpSessionFactory
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool import McpTool
-from agent_orchestrator.application.port.outbound.tool_port import ToolPort
+from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort
 from agent_orchestrator.domain.exception.tool_unavailable_exception import ToolUnavailableException
 from agent_orchestrator.domain.model.tool_specification import ToolSpecification
 
@@ -23,6 +23,7 @@ class McpToolProvider:
                     name=tool.name,
                     description=tool.description or "",
                     parameters=tool.input_schema,
+                    output_schema=tool.output_schema,
                 ),
             )
             for tool in response.tools

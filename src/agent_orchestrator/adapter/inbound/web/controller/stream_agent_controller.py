@@ -15,7 +15,7 @@ from agent_orchestrator.adapter.inbound.web.schema.agent_message_stream_schema i
 )
 from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
 from agent_orchestrator.application.port.inbound.stream_agent_port import StreamAgentPort
-from agent_orchestrator.application.port.outbound.sse_queue_port import SSEQueuePort
+from agent_orchestrator.application.port.outbound.event_stream_port import EventStreamPort
 from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
 from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
 from agent_orchestrator.domain.model.agent_request import AgentRequest
@@ -25,7 +25,7 @@ class StreamAgentController:
     def __init__(
         self,
         use_case: StreamAgentPort,
-        stream_events: Callable[[], SSEQueuePort],
+        stream_events: Callable[[], EventStreamPort],
         logger: Logger,
         max_concurrent_streams: int = 200,
     ) -> None:
@@ -51,7 +51,7 @@ class StreamAgentController:
             self._logger.info(f"[{request_id}] stream request accepted")
 
             domain_request: AgentRequest = request.to_domain()
-            events: SSEQueuePort = self._stream_events()
+            events: EventStreamPort = self._stream_events()
 
             use_case_task: Task[None] = asyncio.create_task(
                 self._use_case.execute(domain_request, events)
@@ -70,16 +70,19 @@ class StreamAgentController:
         self,
         request_id: str,
         request: AgentRequestSchema,
-        events: SSEQueuePort,
+        events: EventStreamPort,
         use_case_task: Task[None],
         starlette_request: Request | None,
     ) -> AsyncIterator[bytes]:
         try:
+            stream: AsyncIterator[AgentMessageStream] = aiter(events)
             while True:
                 if starlette_request is not None and await starlette_request.is_disconnected():
                     raise asyncio.CancelledError
 
-                event: AgentMessageStream = await events.queue.get()
+                event: AgentMessageStream | None = await anext(stream, None)
+                if event is None:
+                    break
 
                 if event.type is MessageStreamType.FINAL:
                     yield AgentMessageSchema(
@@ -91,9 +94,6 @@ class StreamAgentController:
                     yield AgentMessageStreamSchema(
                         type=event.type, content=event.content
                     ).serialize()
-
-                if event.type is MessageStreamType.COMPLETE:
-                    break
 
         except asyncio.CancelledError:
             self._logger.warning(f"[{request_id}] stream cancelled by the client")

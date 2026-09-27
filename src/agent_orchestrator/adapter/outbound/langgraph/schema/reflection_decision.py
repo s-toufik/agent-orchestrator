@@ -5,7 +5,7 @@ from agent_orchestrator.adapter.outbound.langgraph.enum.reflection_action import
 
 class ReflectionDecision(BaseModel):
     action: ReflectionAction
-    critique: str
+    critique: str = ""
 
     @property
     def should_retry(self) -> bool:

@@ -3,6 +3,8 @@ from enum import StrEnum
 
 class MessageStreamType(StrEnum):
     TOKEN = "token"
-    COMPLETE = "complete"
-    ERROR = "error"
+    STATUS = "status"
+    RESET = "reset"
     FINAL = "final"
+    ERROR = "error"
+    COMPLETE = "complete"

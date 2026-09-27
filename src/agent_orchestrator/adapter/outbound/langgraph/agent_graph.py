@@ -3,67 +3,87 @@ from typing import Any
 
 from langgraph.graph import END, StateGraph
 
-from agent_orchestrator.adapter.outbound.langgraph.node.execution_node import ExecutorNode
+from agent_orchestrator.adapter.outbound.langgraph.agent_router import (
+    ACT,
+    CLARIFY,
+    FEEDBACK,
+    FINALIZE,
+    PLAN,
+    REFLECT,
+    TOOLS,
+    AgentRouter,
+)
+from agent_orchestrator.adapter.outbound.langgraph.node.act_node import ActNode
+from agent_orchestrator.adapter.outbound.langgraph.node.clarify_node import ClarifyNode
+from agent_orchestrator.adapter.outbound.langgraph.node.context_node import ContextNode
 from agent_orchestrator.adapter.outbound.langgraph.node.feedback_node import FeedbackNode
-from agent_orchestrator.adapter.outbound.langgraph.node.final_node import FinalNode
-from agent_orchestrator.adapter.outbound.langgraph.node.memory_node import MemoryNode
-from agent_orchestrator.adapter.outbound.langgraph.node.planner_node import PlannerNode
-from agent_orchestrator.adapter.outbound.langgraph.node.reflection_node import ReflectionNode
-from agent_orchestrator.adapter.outbound.langgraph.node.router_node import RouterNode
-from agent_orchestrator.adapter.outbound.langgraph.schema.graph_state import GraphState
+from agent_orchestrator.adapter.outbound.langgraph.node.finalize_node import FinalizeNode
+from agent_orchestrator.adapter.outbound.langgraph.node.ingest_node import IngestNode
+from agent_orchestrator.adapter.outbound.langgraph.node.plan_node import PlanNode
+from agent_orchestrator.adapter.outbound.langgraph.node.reflect_node import ReflectNode
+from agent_orchestrator.adapter.outbound.langgraph.node.summarize_node import SummarizeNode
+from agent_orchestrator.adapter.outbound.langgraph.node.tools_node import ToolsNode
+from agent_orchestrator.adapter.outbound.langgraph.port.node_port import NodePort
+from agent_orchestrator.adapter.outbound.langgraph.store.graph_state import GraphState
+
+INGEST: str = "ingest"
+CONTEXT: str = "context"
+SUMMARIZE: str = "summarize"
 
 
 class AgentGraph:
     def __init__(
         self,
-        planner: PlannerNode,
-        router: RouterNode,
-        executor: ExecutorNode,
-        memory: MemoryNode,
-        reflection: ReflectionNode,
+        ingest: IngestNode,
+        context: ContextNode,
+        clarify: ClarifyNode,
+        plan: PlanNode,
+        act: ActNode,
+        tools: ToolsNode,
+        reflect: ReflectNode,
         feedback: FeedbackNode,
-        final: FinalNode,
+        finalize: FinalizeNode,
+        summarize: SummarizeNode,
     ) -> None:
-        self._planner = planner
-        self._router = router
-        self._executor = executor
-        self._memory = memory
-        self._reflection = reflection
-        self._feedback = feedback
-        self._final = final
+        self._nodes: dict[str, NodePort] = {
+            INGEST: ingest,
+            CONTEXT: context,
+            CLARIFY: clarify,
+            PLAN: plan,
+            ACT: act,
+            TOOLS: tools,
+            REFLECT: reflect,
+            FEEDBACK: feedback,
+            FINALIZE: finalize,
+            SUMMARIZE: summarize,
+        }
 
     # noinspection PyTypeChecker
     def build(self, checkpointer: Any = None) -> Any:
         graph = StateGraph(GraphState)  # ty: ignore[invalid-argument-type]
-        graph.add_node("planner", self._planner)
-        graph.add_node("executor", self._executor)
-        graph.add_node("memory", self._memory)
-        graph.add_node("memory_pre_reflection", self._memory)
-        graph.add_node("reflection", self._reflection)
-        graph.add_node("feedback", self._feedback)
-        graph.add_node("final", self._final)
+        for name, node in self._nodes.items():
+            graph.add_node(name, node)
 
-        graph.set_entry_point("memory")
+        graph.set_entry_point(INGEST)
+        graph.add_edge(INGEST, CONTEXT)
 
-        # Only planner and reflection still need runtime branching.
-        planner_targets: dict[Hashable, str] = {
-            "executor": "executor",
-            "reflection": "memory_pre_reflection",  # planner's "no tool" branch
-            "final": "final",
-        }
-        reflection_targets: dict[Hashable, str] = {
-            "feedback": "feedback",
-            "final": "final",
-        }
+        graph.add_conditional_edges(
+            CONTEXT, AgentRouter.after_context, _targets(CLARIFY, PLAN, ACT)
+        )
+        graph.add_conditional_edges(ACT, AgentRouter.after_act, _targets(TOOLS, REFLECT, FINALIZE))
+        graph.add_conditional_edges(
+            REFLECT, AgentRouter.after_reflect, _targets(FEEDBACK, FINALIZE)
+        )
 
-        graph.add_conditional_edges("planner", self._router, planner_targets)
-        graph.add_conditional_edges("reflection", self._router, reflection_targets)
-
-        # Deterministic: every path into memory has a fixed destination.
-        graph.add_edge("memory", "planner")
-        graph.add_edge("memory_pre_reflection", "reflection")
-        graph.add_edge("executor", "memory")
-        graph.add_edge("feedback", "memory")
-        graph.add_edge("final", END)
+        graph.add_edge(CLARIFY, FINALIZE)
+        graph.add_edge(PLAN, FINALIZE)
+        graph.add_edge(TOOLS, ACT)
+        graph.add_edge(FEEDBACK, ACT)
+        graph.add_edge(FINALIZE, SUMMARIZE)
+        graph.add_edge(SUMMARIZE, END)
 
         return graph.compile(checkpointer=checkpointer)
+
+
+def _targets(*names: str) -> dict[Hashable, str]:
+    return {name: name for name in names}

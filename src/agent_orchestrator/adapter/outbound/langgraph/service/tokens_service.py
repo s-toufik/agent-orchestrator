@@ -5,7 +5,6 @@ _MESSAGE_OVERHEAD = 4
 
 
 def count_tokens(text: str) -> int:
-    """Cheap, dependency-free approximation. Good enough to drive trimming."""
     if not text:
         return 0
     return sum(1 + len(_SEPARATOR.findall(word)) for word in text.split())
