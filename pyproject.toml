@@ -35,6 +35,8 @@ dependencies = [
     "langgraph-checkpoint-sqlite",
     "pymongo>=4.9,<4.18",
     "langgraph-checkpoint-mongodb",
+    "claude-agent-sdk>=0.2.160",
+    "anthropic>=1.8.0",
 ]
 
 [project.scripts]
@@ -83,3 +85,4 @@ exclude = [".venv", "tests"]
 
 [project.urls]
 Homepage = "https://github.com/s-toufik/agent-orchestrator"
+
