@@ -15,11 +15,14 @@ application_configuration:
 
   operation:
     qwen3-8b: ${operation.qwen3-8b}
-    ministral-8b-instruct-2410: ${operation.ministral-8b-instruct-2410}
+    qwen3_5-0_8b: ${operation.qwen3_5-0_8b}
+    qwen3-1_7b: ${operation.qwen3-1_7b}
+    qwen3_5-2b: ${operation.qwen3_5-2b}
     lfm2-8b-a1b: ${operation.lfm2-8b-a1b}
+    ministral-8b-instruct-2410: ${operation.ministral-8b-instruct-2410}
+    gigachat3_1-10b-a1_8b: ${operation.gigachat3_1-10b-a1_8b}
     qwen3-14b: ${operation.qwen3-14b}
-    gpt-oss-20b: ${operation.gpt-oss-20b}
-    lfm2-24b-a2b: ${operation.lfm2-24b-a2b}
-    mistral-small-3-2-24b-instruct: ${operation.mistral-small-3-2-24b-instruct}
-    gemma4-26b-a4b: ${operation.gemma4-26b-a4b}
-    qwen3-30b-a3b-instruct-2507: ${operation.qwen3-30b-a3b-instruct-2507}
+    agent_context: ${operation.agent_context}
+    agent_plan: ${operation.agent_plan}
+    agent_reflection: ${operation.agent_reflection}
+    agent_summary: ${operation.agent_summary}

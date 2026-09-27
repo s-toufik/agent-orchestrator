@@ -1,0 +1,61 @@
+# The LLM each agent role calls. `parameters.model: null` means the model selected in the UI
+# (with its settings from llm.yml). Otherwise the role always uses this model, with the
+# parameters below. The answer itself (act) always uses the model selected in the UI.
+#
+# Roles per engine:
+#   agent_context     langgraph ContextNode · anthropic_sdk ContextStep
+#   agent_plan        langgraph PlanNode    · anthropic_sdk PlanStep
+#   agent_reflection  langgraph ReflectNode · anthropic_sdk ReflectStep
+#   agent_summary     langgraph SummarizeNode (the SDK engine lets the CLI compact instead)
+operation:
+  agent_context:
+    name: agent_context
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: qwen3-8b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      reasoning_effort: null
+
+  agent_plan:
+    name: agent_plan
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: null
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      reasoning_effort: null
+
+  agent_reflection:
+    name: agent_reflection
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: null
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      reasoning_effort: null
+
+  agent_summary:
+    name: agent_summary
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: qwen3-8b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      reasoning_effort: null
