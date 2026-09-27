@@ -40,6 +40,7 @@ MCP_CONNECTOR_NAME: str = "toolbox"
 EXTERNAL_MCP_PREFIX: str = "external_mcp_"
 LLM_CONNECTOR_NAME: str = "llm"
 MONGODB_CONNECTOR_NAME: str = "mongodb_checkpointer"
+SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
 
 MODEL_ALIASES: dict[str, str] = {
     "qwen3-8b": "qwen3-8b",
@@ -54,6 +55,7 @@ MODEL_ALIASES: dict[str, str] = {
 
 
 class AgentRole(StrEnum):
+    ACT = "agent_act"
     CONTEXT = "agent_context"
     PLAN = "agent_plan"
     REFLECTION = "agent_reflection"

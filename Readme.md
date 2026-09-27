@@ -194,19 +194,22 @@ parameters; `MODEL_ALIASES` maps the name requests use to that key.
 
 ### Model per step (`operation/agent.yml`)
 
-The model named in the request always writes the answer. The other steps each have an entry:
+Each step that calls a model has an entry:
 
 | Entry | Step | Default |
 |---|---|---|
-| `agent_context` | understands each message and picks the route | `qwen3-8b` |
-| `agent_plan` | writes the plan | `null` |
+| `agent_act` | writes the answer and runs the tools | `null` |
+| `agent_context` | understands each message and picks the route | `qwen3.5-0.8b` |
+| `agent_plan` | writes the plan | `qwen3-1.7b` |
 | `agent_reflection` | checks the answer before it is sent | `null` |
-| `agent_summary` | summarises long conversations (`langgraph` only) | `qwen3-8b` |
+| `agent_summary` | summarises long conversations (`langgraph` only) | `qwen3.5-0.8b` |
 
-- `parameters.model: <model name>`: the step always uses that model, with the parameters
-  written in the same entry.
-- `parameters.model: null`: the step uses the model named in the request, with its
-  `llm.yml` parameters.
+- `parameters.model: null`: the step uses the model named in the request (the one picked in
+  the UI), with its `llm.yml` parameters.
+- `parameters.model: <model name>`: the step is frozen to that model, whatever the UI picks,
+  with the parameters written in the same entry. Freezing `agent_act` too makes the whole agent
+  independent of the UI choice; its entry then also sets the turn's budget
+  (`max_iterations`, `max_reflection_retries`, `max_context_tokens`, `use_streaming`).
 
 Changing a step's model is a config edit and a restart.
 

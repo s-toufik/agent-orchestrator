@@ -1,9 +1,3 @@
-# The models served by the homelab (homelab-infra/llm/config.yml). max_context_tokens is the
-# server's --ctx-size. reasoning_effort: null = no thinking, low/medium/high = thinking (Qwen
-# only, no levels; sent as chat_template_kwargs.enable_thinking). Thinking is much slower and
-# needs a larger max_output_tokens.
-# A key cannot contain a dot (OmegaConf reads it as a path): `.` becomes `_` in the key,
-# `model` keeps the name the server knows.
 operation:
   qwen3-8b:
     name: qwen3-8b

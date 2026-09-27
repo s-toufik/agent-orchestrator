@@ -22,6 +22,7 @@ application_configuration:
     ministral-8b-instruct-2410: ${operation.ministral-8b-instruct-2410}
     gigachat3_1-10b-a1_8b: ${operation.gigachat3_1-10b-a1_8b}
     qwen3-14b: ${operation.qwen3-14b}
+    agent_act: ${operation.agent_act}
     agent_context: ${operation.agent_context}
     agent_plan: ${operation.agent_plan}
     agent_reflection: ${operation.agent_reflection}

@@ -58,6 +58,12 @@ _EFFORT: dict[ReasoningEffort, EffortLevel] = {
     ReasoningEffort.HIGH: "high",
 }
 SESSIONS_COLLECTION: str = "agent_sdk_sessions"
+_SDK_ROLES: tuple[AgentRole, ...] = (
+    AgentRole.ACT,
+    AgentRole.CONTEXT,
+    AgentRole.PLAN,
+    AgentRole.REFLECTION,
+)
 
 
 class AnthropicSdkDI(AgentDI):
@@ -175,12 +181,12 @@ class AnthropicSdkDI(AgentDI):
         }
 
     def _model_roles(self) -> ModelRoles:
-        # Summary is not a role here: the CLI compacts the conversation itself.
         profiles: dict[AgentRole, ModelProfile | None] = {}
-        for role in (AgentRole.CONTEXT, AgentRole.PLAN, AgentRole.REFLECTION):
+        for role in _SDK_ROLES:
             settings = self._role_settings(role)
             profiles[role] = _model_profile(settings[1]) if settings else None
         return ModelRoles(
+            act=profiles[AgentRole.ACT],
             context=profiles[AgentRole.CONTEXT],
             plan=profiles[AgentRole.PLAN],
             reflection=profiles[AgentRole.REFLECTION],
@@ -192,7 +198,7 @@ class AnthropicSdkDI(AgentDI):
             parameters.model_name: parameters
             for parameters in (self._model_settings(name)[1] for name in MODEL_ALIASES.values())
         }
-        for role in (AgentRole.CONTEXT, AgentRole.PLAN, AgentRole.REFLECTION):
+        for role in _SDK_ROLES:
             settings = self._role_settings(role)
             if settings is not None:
                 models.setdefault(settings[1].model_name, settings[1])

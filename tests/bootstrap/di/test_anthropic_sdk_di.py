@@ -8,6 +8,7 @@ from pycraftcore.authentication.model.no_auth import NoAuth
 from pycraftcore.authentication.model.token_auth import TokenAuth
 
 from bootstrap.configuration.anthropic_sdk_settings import AnthropicSdkSettings
+from bootstrap.di.agent_di import AgentRole
 from bootstrap.di.anthropic_sdk_di import AnthropicSdkDI, _mcp_server
 from tests.bootstrap.di.test_agent_di import make_settings
 
@@ -84,16 +85,33 @@ def test_no_collector_means_no_cli_telemetry(monkeypatch) -> None:
     assert AnthropicSdkDI(make_settings())._cli_otlp_endpoint() is None
 
 
-def test_roles_come_from_agent_yml_and_null_follows_the_selected_model() -> None:
-    roles = AnthropicSdkDI(make_settings())._model_roles()
-    selected = AnthropicSdkDI(make_settings())._model_profiles()["qwen3-14b"]
+def test_roles_come_from_agent_yml_and_null_follows_the_selected_model(monkeypatch) -> None:
+    di = AnthropicSdkDI(make_settings())
+    frozen = {AgentRole.ACT: "qwen3-8b", AgentRole.CONTEXT: "qwen3-1.7b"}
+    monkeypatch.setattr(
+        di,
+        "_role_settings",
+        lambda role: di._model_settings(frozen[role].replace(".", "_")) if role in frozen else None,
+    )
+    selected = di._model_profiles()["qwen3-14b"]
 
-    turn = roles.for_turn(selected)
+    turn = di._model_roles().for_turn(selected)
 
-    assert roles.context is not None and roles.context.name == "qwen3-8b"
-    assert roles.context.reasoning_effort is None
-    assert (turn.act, turn.plan, turn.reflection) == (selected, selected, selected)
-    assert turn.context.name == "qwen3-8b"
+    assert turn.act.name == "qwen3-8b"
+    assert turn.context.name == "qwen3-1.7b"
+    assert (turn.plan, turn.reflection) == (selected, selected)
+
+
+def test_a_frozen_act_model_is_served_by_the_gateway(monkeypatch) -> None:
+    di = AnthropicSdkDI(make_settings())
+    parameters = di._model_settings("qwen3-8b")[1].model_copy(update={"model_name": "frozen-act"})
+    monkeypatch.setattr(
+        di,
+        "_role_settings",
+        lambda role: (None, parameters) if role is AgentRole.ACT else None,
+    )
+
+    assert "frozen-act" in [model.model_name for model in di._gateway_models()]
 
 
 def test_the_gateway_serves_each_model_once() -> None:

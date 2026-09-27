@@ -11,9 +11,13 @@ from agent_orchestrator.adapter.outbound.langgraph.langgraph_agent import LangGr
 from agent_orchestrator.adapter.outbound.llm.langchain.chat_factory import LLMChat
 from agent_orchestrator.adapter.outbound.tool.tool_port import ToolRegistryPort
 from agent_orchestrator.application.port.outbound.agent_port import AgentPort
-from bootstrap.di.agent_di import MODEL_ALIASES, MONGODB_CONNECTOR_NAME, AgentDI, AgentRole
-
-SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
+from bootstrap.di.agent_di import (
+    MODEL_ALIASES,
+    MONGODB_CONNECTOR_NAME,
+    SQLITE_CHECKPOINTER,
+    AgentDI,
+    AgentRole,
+)
 
 
 class LangGraphDI(AgentDI):
@@ -60,10 +64,10 @@ class LangGraphDI(AgentDI):
     def _build_graph(
         self, model_name: str, checkpointer: Any, tool_registry: ToolRegistryPort
     ) -> Any:
-        _, parameters = self._model_settings(model_name)
+        _, parameters = self._role_settings(AgentRole.ACT) or self._model_settings(model_name)
 
         return build_agent(
-            act_llm=self._llm_for_model(model_name, use_streaming=False),
+            act_llm=self._llm_for_role(AgentRole.ACT, model_name),
             context_llm=self._llm_for_role(AgentRole.CONTEXT, model_name),
             plan_llm=self._llm_for_role(AgentRole.PLAN, model_name),
             reflection_llm=self._llm_for_role(AgentRole.REFLECTION, model_name),

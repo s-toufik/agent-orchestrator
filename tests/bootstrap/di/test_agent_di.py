@@ -201,12 +201,50 @@ async def test_checkpointer_opens_a_real_sqlite_connection() -> None:
     await di._stop_factories()
 
 
-def test_a_role_set_in_agent_yml_keeps_its_model_and_a_null_role_follows_the_selection() -> None:
+def test_each_role_reads_its_model_from_agent_yml() -> None:
+    # Whatever agent.yml holds today: a named model is used, null means "follow the selection".
     di = LangGraphDI(make_settings())
 
-    context = di._llm_for_role(AgentRole.CONTEXT, "qwen3-14b")
-    plan = di._llm_for_role(AgentRole.PLAN, "qwen3-14b")
+    for role in AgentRole:
+        configured = di._configuration.operation.api(role).parameters.get("model")
+        settings = di._role_settings(role)
 
-    assert (context.model_name, context.reasoning_effort) == ("qwen3-8b", None)
-    assert plan.model_name == "qwen3-14b"
-    assert not context.streaming and not plan.streaming
+        assert (settings[1].model_name if settings else None) == configured, role
+
+
+def _freeze(monkeypatch, di: LangGraphDI, frozen: dict[AgentRole, str]) -> None:
+    # A role named here is frozen to that model; every other role is null.
+    def role_settings(role: AgentRole):
+        if role not in frozen:
+            return None
+        connector, parameters = di._model_settings(frozen[role])
+        return connector, parameters.model_copy(update={"max_iterations": 3})
+
+    monkeypatch.setattr(di, "_role_settings", role_settings)
+
+
+def test_a_null_role_follows_the_selection_and_a_frozen_one_does_not(monkeypatch) -> None:
+    di = LangGraphDI(make_settings())
+    _freeze(monkeypatch, di, {AgentRole.CONTEXT: "qwen3-8b"})
+
+    context = di._llm_for_role(AgentRole.CONTEXT, "qwen3-14b")
+    act = di._llm_for_role(AgentRole.ACT, "qwen3-14b")
+
+    assert context.model_name == "qwen3-8b"
+    assert act.model_name == "qwen3-14b"
+    assert not context.streaming and not act.streaming
+
+
+def test_a_frozen_act_ignores_the_selection_and_sets_the_turn_budget(monkeypatch) -> None:
+    di = LangGraphDI(make_settings())
+    _freeze(monkeypatch, di, {AgentRole.ACT: "qwen3-8b"})
+    captured: dict = {}
+    monkeypatch.setattr(
+        "bootstrap.di.langgraph_di.build_agent", lambda **kwargs: captured.update(kwargs)
+    )
+
+    di._build_graph("qwen3-14b", checkpointer=None, tool_registry=None)
+
+    assert captured["act_llm"].model_name == "qwen3-8b"
+    assert captured["plan_llm"].model_name == "qwen3-14b"
+    assert captured["model_parameters"].max_iterations == 3
