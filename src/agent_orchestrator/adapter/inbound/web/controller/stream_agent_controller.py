@@ -35,20 +35,18 @@ class StreamAgentController:
         self._admission = asyncio.Semaphore(max_concurrent_streams)
 
     async def execute(self, request: AgentRequestSchema) -> StreamingResponse:
-        request_id: str = request.request_id or request_id_context.get() or "N/A"
-
         if request.request_id:
             request_id_context.set(request.request_id)
 
         if self._admission.locked():
-            self._logger.warning(f"[{request_id}] rejected: server at capacity")
+            self._logger.warning("rejected: server at capacity")
             raise HTTPException(status_code=503, detail="Server is at capacity, please retry.")
 
         await self._admission.acquire()
 
         try:
             starlette_request: Request | None = request_context.get() or None
-            self._logger.info(f"[{request_id}] stream request accepted")
+            self._logger.info("stream request accepted")
 
             domain_request: AgentRequest = request.to_domain()
             events: EventStreamPort = self._stream_events()
@@ -61,14 +59,13 @@ class StreamAgentController:
             raise
 
         return StreamingResponse(
-            self._event_generator(request_id, request, events, use_case_task, starlette_request),
+            self._event_generator(request, events, use_case_task, starlette_request),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
 
     async def _event_generator(
         self,
-        request_id: str,
         request: AgentRequestSchema,
         events: EventStreamPort,
         use_case_task: Task[None],
@@ -96,11 +93,11 @@ class StreamAgentController:
                     ).serialize()
 
         except asyncio.CancelledError:
-            self._logger.warning(f"[{request_id}] stream cancelled by the client")
+            self._logger.warning("stream cancelled by the client")
             raise
         except Exception as exception:
             traceback_str: str = "".join(traceback.format_exception(exception))
-            self._logger.error(f"[{request_id}] unhandled streaming error:\n{traceback_str}")
+            self._logger.error(f"unhandled streaming error:\n{traceback_str}")
             yield AgentMessageSchema(
                 session_id=request.request_id, content="", error=traceback_str
             ).serialize()

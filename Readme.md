@@ -127,6 +127,7 @@ configuration files and must be present, even when the engine you run does not u
 | Variable | Default | Meaning |
 |---|---|---|
 | `APP_ENV` | `debug` | which `config/<APP_ENV>/` folder is read |
+| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. Each line shows the request id (`-` outside a request) |
 | `CONFIGURATION_DIR` | `./config` | where `config/` is |
 | `DEPLOYMENT_ENVIRONMENT` | `unknown` | label put on telemetry |
 | `AGENT_ENGINE` | `langgraph` | `langgraph` or `anthropic_sdk` |
@@ -253,17 +254,19 @@ Discovered 5 MCP tools from 'external_mcp_analytics': ...
 
 ## Logging
 
-The service logs through **loguru** by default. To use Python's standard `logging`
-instead:
+Standard Python `logging`, one format for every line (set up by pycraftcore's
+`configure_logging`):
 
-- Open `src/bootstrap/di/base_di.py`
-- Replace the `LoguruLogger` import with `StandardLogger`
-  (`from pycraftcore.logger.adapter import StandardLogger`)
-- In `_logging`, replace `LoguruLogger()` with `StandardLogger()`
-- In `_telemetry_provider`, remove the `self._logging.attach(log_handler)` line
-  (`StandardLogger` already reaches the OpenTelemetry exporter; keeping it would ship every
-  line twice)
-- Restart the service
+```
+2026-09-27 10:47:47.785 | INFO     | demo-logging-123 | stream_agent_controller:execute:50 - stream request accepted
+```
+
+- `LOG_LEVEL` sets the level (`INFO` by default).
+- The third column is the request id (the `X-Request-ID` header, or the conversation id for
+  `/v1/stream`); it appears on every line of that request by itself, `-` outside one. Do not
+  put it in log messages.
+- With `OTEL_HOST`/`OTEL_PORT` set, the same lines also go to the OpenTelemetry collector
+  (Loki), with `request_id` as an attribute.
 
 ---
 

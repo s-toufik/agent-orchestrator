@@ -71,7 +71,7 @@ class AnthropicSdkAgent:
 
         agent_state = await steps.ingest.run(request.request_id)
         turn = await steps.context.run(models.context, agent_state, request.message, channel)
-        self._logger.debug(f"[{request.request_id}] {turn.mode} turn: {turn.context}")
+        self._logger.debug(f"{turn.mode} turn: {turn.context}")
 
         result: ResultMessage | None = None
         match turn.mode:

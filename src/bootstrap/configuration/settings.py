@@ -16,6 +16,7 @@ class ProcessSettings:
     role: str
     environment: str
     configuration_directory: Path
+    log_level: str = "INFO"
     engine: AgentEngine = AgentEngine.LANGGRAPH
     max_concurrent_streams: int = 200
 
@@ -28,6 +29,7 @@ class ProcessSettings:
             role=role,
             environment=os.getenv("APP_ENV", "debug"),
             configuration_directory=Path(directory),
+            log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
             engine=AgentEngine(os.getenv("AGENT_ENGINE", AgentEngine.LANGGRAPH)),
             max_concurrent_streams=int(os.getenv("MAX_CONCURRENT_STREAMS", "200")),
         )

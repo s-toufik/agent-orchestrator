@@ -117,7 +117,6 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
 
     events = SSEQueue()
     generator = controller._event_generator(
-        request_id="r1",
         request=REQUEST,
         events=events,
         use_case_task=asyncio.create_task(HangingUseCase().execute(REQUEST, events)),
@@ -145,7 +144,6 @@ async def test_an_unexpected_error_yields_an_error_frame_then_reraises(logger) -
     await done_task
 
     generator = controller._event_generator(
-        request_id="r1",
         request=REQUEST,
         events=BrokenEvents(),
         use_case_task=done_task,

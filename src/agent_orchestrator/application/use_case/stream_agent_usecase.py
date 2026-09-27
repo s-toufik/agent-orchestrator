@@ -26,11 +26,11 @@ class StreamAgentUseCase:
             async for event in self._agent.stream(request):
                 await events.publish(event)
         except AgentUnavailableException as exception:
-            self._logger.warning(f"[{request.request_id}] agent unavailable: {exception}")
+            self._logger.warning(f"agent unavailable: {exception}")
             await events.publish(AgentMessageStream.error(AGENT_UNAVAILABLE_MESSAGE))
         except Exception as exception:
             traceback_str: str = "".join(traceback.format_exception(exception))
-            self._logger.error(f"[{request.request_id}] unhandled agent error:\n{traceback_str}")
+            self._logger.error(f"unhandled agent error:\n{traceback_str}")
             await events.publish(AgentMessageStream.error(traceback_str))
         finally:
             await events.complete()
