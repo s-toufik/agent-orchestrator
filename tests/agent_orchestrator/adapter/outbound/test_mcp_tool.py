@@ -8,8 +8,6 @@ SPEC = ToolSpecification(name="run_sql", description="SQL.", parameters={"type":
 
 
 class _UnusedSessionFactory:
-    """Satisfies McpSessionFactory's shape; McpTool.specification never touches it."""
-
     def session(self) -> AbstractAsyncContextManager[Any]:
         raise NotImplementedError
 

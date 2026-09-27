@@ -44,12 +44,6 @@ def anyio_backend() -> Any:
 
 @pytest.fixture(autouse=True)
 def _fake_mongo_client(monkeypatch):
-    """No real MongoDB is available in tests. AgentDI._checkpointer() tries a
-    MongoDB checkpointer first and falls back to sqlite on any connection
-    failure (see AgentDI._mongo_connection) -- fake the client so that
-    fallback path is exercised for real, without a real (and slow, and
-    environment-dependent) network connection attempt.
-    """
     from pycraftcore.repository.adapter.no_sql.mongodb import factory as mongo_factory
 
     class _UnreachableMongoClient:
@@ -68,18 +62,6 @@ def _fake_mongo_client(monkeypatch):
 
 @pytest.fixture(autouse=True, scope="session")
 def _isolate_global_tracer_provider():
-    """Neutralize the process-wide OpenTelemetry tracer-provider singleton for
-    the whole test session.
-
-    OpenTelemetryProvider.__init__ calls trace.set_tracer_provider(provider) --
-    a global, meant to be set once per process. With ~200 tests each
-    constructing (and some shutting down) their own provider, the MCP SDK's
-    own internal otel_span() calls (used on every real MCP request, server
-    and client side) eventually pick up a since-shut-down provider and break
-    mid-request ("SSE stream ended without a response"). The provider object
-    each DI/test constructs is still fully real, independently usable, and
-    independently shutdownable -- only the *global* registration is disabled.
-    """
     import opentelemetry.trace as otel_trace
 
     with pytest.MonkeyPatch.context() as mp:

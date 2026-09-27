@@ -32,12 +32,12 @@ def test_posting_to_the_endpoint_forwards_the_parsed_request_to_the_controller()
 
     response = client.post(
         "/v1/stream",
-        json={"message": "hi", "model_name": "gpt-oss-20b", "request_id": "r1"},
+        json={"message": "hi", "model_name": "qwen3-14b", "request_id": "r1"},
     )
 
     assert response.status_code == 200
     assert controller.received is not None
     assert controller.received.message == "hi"
-    assert controller.received.model_name == "gpt-oss-20b"
+    assert controller.received.model_name == "qwen3-14b"
     assert controller.received.request_id == "r1"
     assert response.text == "event: final\ndata: {}\n\n"

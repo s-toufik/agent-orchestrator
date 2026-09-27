@@ -15,7 +15,8 @@ from pycraftcore.application_configuration.model.operation import OperationRegis
 from pycraftcore.authentication.model.no_auth import NoAuth
 
 from bootstrap.configuration.settings import ProcessSettings
-from bootstrap.di.agent_di import EXTERNAL_MCP_PREFIX, MCP_CONNECTOR_NAME, AgentDI
+from bootstrap.di.agent_di import EXTERNAL_MCP_PREFIX, MCP_CONNECTOR_NAME, AgentDI, AgentRole
+from bootstrap.di.langgraph_di import LangGraphDI
 
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
@@ -130,10 +131,6 @@ class _FakeMcpSession:
 
 
 class _FakeMcpSessionFactory:
-    """Stands in for the toolbox connection: agent and toolbox are separate
-    services now, so this fakes the McpSessionFactory boundary between them
-    instead of spinning up a real in-process MCP server."""
-
     def __init__(self, tools: list) -> None:
         self._tools = tools
 
@@ -147,6 +144,7 @@ class _AdvertisedTool:
         self.name = name
         self.description = description
         self.input_schema = input_schema
+        self.output_schema = None
 
 
 async def test_tool_registry_discovers_tools_from_the_mcp_server() -> None:
@@ -160,13 +158,55 @@ async def test_tool_registry_discovers_tools_from_the_mcp_server() -> None:
     assert [spec.name for spec in registry.specifications()] == ["echo"]
 
 
+class _UnreachableMcpSessionFactory:
+    @asynccontextmanager
+    async def session(self) -> AsyncIterator[_FakeMcpSession]:
+        raise ConnectionError("connection refused")
+        yield  # pragma: no cover
+
+
+async def test_tool_registry_skips_mcp_servers_that_are_down_or_advertise_nothing() -> None:
+    di = AgentDI(make_settings())
+    di.__dict__["_mcp_session_factories"] = {
+        "toolbox": _UnreachableMcpSessionFactory(),
+        f"{EXTERNAL_MCP_PREFIX}empty": _FakeMcpSessionFactory([]),
+        f"{EXTERNAL_MCP_PREFIX}analytics": _FakeMcpSessionFactory(
+            [_AdvertisedTool("echo", "Echoes.", {"type": "object"})]
+        ),
+    }
+
+    registry = await di._tool_registry()
+
+    assert [spec.name for spec in registry.specifications()] == ["echo"]
+
+
+async def test_tool_registry_is_empty_but_usable_when_no_mcp_server_answers() -> None:
+    di = AgentDI(make_settings())
+    di.__dict__["_mcp_session_factories"] = {"toolbox": _UnreachableMcpSessionFactory()}
+
+    registry = await di._tool_registry()
+
+    assert registry.specifications() == []
+
+
 async def test_checkpointer_opens_a_real_sqlite_connection() -> None:
     # No real MongoDB is running, so _checkpointer() falls back to sqlite,
     # which is what this test is exercising. _base_env already sets the
     # sqlite/mongo env vars the config tree needs to resolve.
-    di = AgentDI(make_settings())
+    di = LangGraphDI(make_settings())
 
     checkpointer = await di._checkpointer()
 
     assert checkpointer is not None
     await di._stop_factories()
+
+
+def test_a_role_set_in_agent_yml_keeps_its_model_and_a_null_role_follows_the_selection() -> None:
+    di = LangGraphDI(make_settings())
+
+    context = di._llm_for_role(AgentRole.CONTEXT, "qwen3-14b")
+    plan = di._llm_for_role(AgentRole.PLAN, "qwen3-14b")
+
+    assert (context.model_name, context.reasoning_effort) == ("qwen3-8b", None)
+    assert plan.model_name == "qwen3-14b"
+    assert not context.streaming and not plan.streaming

@@ -10,14 +10,6 @@ _SCHEMA_INSTRUCTION = (
 
 
 class LocalJudgeModel(DeepEvalBaseLLM):
-    """Wraps the project's own local LLM as a DeepEval judge.
-
-    DeepEval metrics default to calling out to an external provider (OpenAI)
-    to score test cases. This wraps whichever `ChatOpenAI` client the agent
-    itself already talks to (LM Studio, served from `connector.llm.base_url`)
-    so evaluation never leaves the machine.
-    """
-
     def __init__(self, chat: ChatOpenAI) -> None:
         self._chat = chat
         super().__init__(model=chat.model_name)

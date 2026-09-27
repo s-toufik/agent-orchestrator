@@ -1,11 +1,12 @@
-from agent_orchestrator.domain.model.agent_message import AgentMessage
+from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
+from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
 from agent_orchestrator.domain.model.agent_request import AgentRequest
 from agent_orchestrator.domain.model.tool_outcome import ToolOutcome
 from agent_orchestrator.domain.model.tool_specification import ToolSpecification
 
 
 def test_request_is_immutable() -> None:
-    request = AgentRequest(message="hello", model_name="gpt-oss-20b", request_id="r1")
+    request = AgentRequest(message="hello", model_name="qwen3-14b", request_id="r1")
 
     try:
         request.message = "other"  # ty: ignore[invalid-assignment]
@@ -15,12 +16,12 @@ def test_request_is_immutable() -> None:
         raise AssertionError("AgentRequest should be frozen")
 
 
-def test_message_defaults_to_a_final_text_message() -> None:
-    message = AgentMessage(session_id="r1", content="answer")
-
-    assert message.message_status.value == "final"
-    assert message.message_type.value == "text"
-    assert message.metadata == {}
+def test_stream_events_are_built_by_type() -> None:
+    assert AgentMessageStream.token("a") == AgentMessageStream(MessageStreamType.TOKEN, "a")
+    assert AgentMessageStream.status("b").type is MessageStreamType.STATUS
+    assert AgentMessageStream.reset() == AgentMessageStream(MessageStreamType.RESET, "")
+    assert AgentMessageStream.final("c", {"k": "v"}).metadata == {"k": "v"}
+    assert AgentMessageStream.final("c").metadata == {}
 
 
 def test_successful_outcome_exposes_its_output() -> None:

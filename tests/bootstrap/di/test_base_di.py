@@ -25,11 +25,6 @@ def _set_required_env(monkeypatch) -> None:
 
 
 class RecordingClient:
-    """Implements AsyncHttpFactory. Only start()/close() are exercised by
-    _start_factories()/_stop_factories() (a hasattr-based duck-typed check),
-    but the type annotation is the full protocol, so the rest are unused stubs.
-    """
-
     def __init__(self) -> None:
         self.started = False
         self.closed = False
@@ -51,8 +46,6 @@ class RecordingClient:
 
 
 class RecordingRepository:
-    """Implements AsyncRepositoryFactory, for the same reason as above."""
-
     def __init__(self) -> None:
         self.connected = False
         self.disconnected = False
@@ -71,12 +64,7 @@ class RecordingRepository:
         raise AssertionError("not expected to be called")
 
 
-class NoLifecycleClient:
-    """Deliberately missing start()/close() -- proves _start_factories() and
-    _stop_factories()'s hasattr checks tolerate a registered object that
-    isn't fully AsyncHttpFactory-compliant, so it can't structurally satisfy
-    that protocol here without defeating the point of the test.
-    """
+class NoLifecycleClient: ...
 
 
 def test_register_client_returns_the_same_object_and_tracks_it() -> None:

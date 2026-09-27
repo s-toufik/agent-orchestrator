@@ -1,13 +1,3 @@
-"""Minimal, generic MCP server scaffolding for tests.
-
-Standing up a real MCP server here (rather than mocking the client) lets
-the agent's MCP client code (StreamableHttpSessionFactory, McpToolProvider,
-AgentDI, AgentContainer) be exercised against real wire traffic. This has
-no dependency on any particular tool server implementation -- it's just the
-`mcp` SDK's own server, wired up the same minimal way any MCP server would
-be.
-"""
-
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Any

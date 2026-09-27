@@ -1,6 +1,7 @@
 import asyncio
 import json
-from typing import Any, cast
+from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 from starlette.exceptions import HTTPException
@@ -10,20 +11,11 @@ from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller i
     StreamAgentController,
 )
 from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
+from agent_orchestrator.adapter.outbound.streaming.sse_queue import SSEQueue
 from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
 from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
 
 REQUEST = AgentRequestSchema(message="hi", model_name="m", request_id="r1")
-
-
-class FakeSSEQueue:
-    def __init__(self) -> None:
-        self.queue: asyncio.Queue[AgentMessageStream] = asyncio.Queue()
-
-    async def token(self, value: str) -> None: ...
-    async def final(self, value: str, metadata: dict | None = None) -> None: ...
-    async def error(self, value: str) -> None: ...
-    async def complete(self) -> None: ...
 
 
 class ScriptedUseCase:
@@ -32,7 +24,7 @@ class ScriptedUseCase:
 
     async def execute(self, request, events) -> None:
         for event in self._events:
-            await events.queue.put(event)
+            await events.publish(event)
 
 
 async def _drain(response) -> list[str]:
@@ -48,7 +40,7 @@ async def test_a_normal_stream_yields_token_then_final_then_complete(logger) -> 
         ),
         AgentMessageStream(type=MessageStreamType.COMPLETE, content=""),
     ]
-    controller = StreamAgentController(ScriptedUseCase(events), FakeSSEQueue, logger)
+    controller = StreamAgentController(ScriptedUseCase(events), SSEQueue, logger)
 
     response = await controller.execute(REQUEST)
     chunks = await _drain(response)
@@ -64,7 +56,7 @@ async def test_a_normal_stream_yields_token_then_final_then_complete(logger) -> 
 async def test_admission_is_released_after_a_stream_completes(logger) -> None:
     events = [AgentMessageStream(type=MessageStreamType.COMPLETE, content="")]
     controller = StreamAgentController(
-        ScriptedUseCase(events), FakeSSEQueue, logger, max_concurrent_streams=1
+        ScriptedUseCase(events), SSEQueue, logger, max_concurrent_streams=1
     )
 
     response = await controller.execute(REQUEST)
@@ -93,7 +85,7 @@ async def test_admission_is_released_when_setup_itself_raises(logger) -> None:
 
 async def test_rejects_with_503_when_at_capacity(logger) -> None:
     controller = StreamAgentController(
-        ScriptedUseCase([]), FakeSSEQueue, logger, max_concurrent_streams=1
+        ScriptedUseCase([]), SSEQueue, logger, max_concurrent_streams=1
     )
     await controller._admission.acquire()
 
@@ -121,9 +113,9 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
         async def is_disconnected(self) -> bool:
             return True
 
-    controller = StreamAgentController(HangingUseCase(), FakeSSEQueue, logger)
+    controller = StreamAgentController(HangingUseCase(), SSEQueue, logger)
 
-    events = FakeSSEQueue()
+    events = SSEQueue()
     generator = controller._event_generator(
         request_id="r1",
         request=REQUEST,
@@ -140,19 +132,15 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
 
 
 async def test_an_unexpected_error_yields_an_error_frame_then_reraises(logger) -> None:
-    class RaisingQueue:
-        async def get(self):
-            raise RuntimeError("queue broke")
-
     class BrokenEvents:
-        queue: Any = RaisingQueue()
-
-        async def token(self, value: str) -> None: ...
-        async def final(self, value: str, metadata: dict | None = None) -> None: ...
-        async def error(self, value: str) -> None: ...
+        async def publish(self, event: AgentMessageStream) -> None: ...
         async def complete(self) -> None: ...
 
-    controller = StreamAgentController(ScriptedUseCase([]), FakeSSEQueue, logger)
+        async def __aiter__(self) -> AsyncIterator[AgentMessageStream]:
+            raise RuntimeError("queue broke")
+            yield  # pragma: no cover
+
+    controller = StreamAgentController(ScriptedUseCase([]), SSEQueue, logger)
     done_task = asyncio.create_task(asyncio.sleep(0))
     await done_task
 

@@ -1,7 +1,3 @@
-"""Exercises McpTool.invoke against a real MCP server (see tests/support/mcp_test_server.py
-for why: this is real wire traffic, not a mocked ClientSession).
-"""
-
 import asyncio
 import socket
 from collections.abc import AsyncIterator
@@ -15,6 +11,7 @@ from pycraftcore.authentication.model.no_auth import NoAuth
 from pydantic import BaseModel
 
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool import McpTool
+from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool_provider import McpToolProvider
 from agent_orchestrator.adapter.outbound.tool.mcp.streamable_http_session_factory import (
     StreamableHttpSessionFactory,
 )
@@ -74,7 +71,7 @@ async def running_server() -> AsyncIterator[str]:
         await serve_task
 
 
-def _tool(base_url: str, name: str, logger) -> McpTool:
+def _session_factory(base_url: str, logger) -> StreamableHttpSessionFactory:
     connector = McpConnector(
         name="self",
         type=ConnectorType.mcp,
@@ -83,8 +80,22 @@ def _tool(base_url: str, name: str, logger) -> McpTool:
         timeout=5,
         transport="streamable_http",
     )
-    session_factory = StreamableHttpSessionFactory(connector, logger)
-    return McpTool(session_factory, ToolSpecification(name=name, description="."))
+    return StreamableHttpSessionFactory(connector, logger)
+
+
+def _tool(base_url: str, name: str, logger) -> McpTool:
+    return McpTool(
+        _session_factory(base_url, logger), ToolSpecification(name=name, description=".")
+    )
+
+
+async def test_provider_carries_each_tools_input_and_output_schema(running_server, logger) -> None:
+    tools = await McpToolProvider(_session_factory(running_server, logger)).tools()
+    specifications = {tool.specification.name: tool.specification for tool in tools}
+
+    assert specifications["structured"].parameters["type"] == "object"
+    assert specifications["structured"].output_schema == Rows.model_json_schema()
+    assert specifications["unstructured"].output_schema is None
 
 
 async def test_prefers_structured_content_when_present(running_server, logger) -> None:

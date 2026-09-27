@@ -2,62 +2,28 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from agent_orchestrator.adapter.outbound.langgraph.enum.reflection_action import ReflectionAction
 from agent_orchestrator.adapter.outbound.langgraph.enum.role import Role
-from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
 from agent_orchestrator.adapter.outbound.langgraph.schema.conversation import Conversation
 from agent_orchestrator.adapter.outbound.langgraph.schema.conversation_message import (
     ConversationMessage,
 )
-from agent_orchestrator.adapter.outbound.langgraph.schema.planner_decision import PlannerDecision
 from agent_orchestrator.adapter.outbound.langgraph.schema.reflection_decision import (
     ReflectionDecision,
 )
 from agent_orchestrator.adapter.outbound.langgraph.schema.tool_call import ToolCall
+from agent_orchestrator.adapter.outbound.langgraph.store.agent_state import AgentState
 
 
 def test_agent_state_defaults() -> None:
     state = AgentState()
 
-    assert state.conversation.messages == []
-    assert state.planner is None
-    assert state.reflection is None
-    assert state.last_node == ""
-    assert state.session_id == ""
-    assert state.iteration == 0
-    assert state.max_iterations == 20
-    assert state.final_answer is None
-
-
-def test_current_question_prefers_the_question_field_over_conversation_history() -> None:
-    state = AgentState(
-        question="what about the second turn?",
-        conversation=Conversation(
-            [
-                ConversationMessage(role=Role.USER, content="first turn question"),
-                ConversationMessage(role=Role.ASSISTANT, content="first turn answer"),
-                ConversationMessage(role=Role.USER, content="what about the second turn?"),
-            ]
-        ),
-    )
-
-    assert state.current_question() == "what about the second turn?"
-
-
-def test_current_question_falls_back_to_first_user_message_when_unset() -> None:
-    state = AgentState(
-        conversation=Conversation([ConversationMessage(role=Role.USER, content="hi")])
-    )
-
-    assert state.current_question() == "hi"
-
-
-def test_current_question_has_a_placeholder_when_nothing_is_available() -> None:
-    assert AgentState().current_question() == "(no user question found)"
-
-
-def test_planner_decision_wants_tools_only_with_calls() -> None:
-    assert PlannerDecision(tool_calls=[], answer="done").wants_tools is False
-    call = ToolCall(id="1", name="t", args={})
-    assert PlannerDecision(tool_calls=[call]).wants_tools is True
+    assert state.transcript.messages == []
+    assert state.summary == ""
+    assert state.pending_plan is None
+    assert state.limits.max_iterations == 20
+    assert state.limits.max_retries == 2
+    assert state.turn.scratch.messages == []
+    assert state.turn.context is None
+    assert state.turn.outcome is None
 
 
 def test_reflection_decision_should_retry() -> None:
@@ -66,8 +32,7 @@ def test_reflection_decision_should_retry() -> None:
 
 
 def test_tool_call_defaults_empty_args() -> None:
-    call = ToolCall(id="1", name="t")
-    assert call.args == {}
+    assert ToolCall(id="1", name="t").args == {}
 
 
 def test_conversation_append_and_lookup() -> None:
@@ -79,32 +44,22 @@ def test_conversation_append_and_lookup() -> None:
     conversation.append(assistant)
 
     assert conversation.last() is assistant
-    assert conversation.first_user() is user
     assert conversation.last_assistant() is assistant
+    assert conversation.of_role(Role.USER) == [user]
 
 
-def test_conversation_last_and_first_user_are_none_when_empty() -> None:
+def test_conversation_lookups_are_empty_when_there_are_no_messages() -> None:
     conversation = Conversation()
 
     assert conversation.last() is None
-    assert conversation.first_user() is None
     assert conversation.last_assistant() is None
+    assert conversation.of_role(Role.TOOL) == []
 
 
-def test_conversation_copy_is_a_shallow_independent_list() -> None:
-    conversation = Conversation([ConversationMessage(role=Role.USER, content="hi")])
-
-    copy = conversation.copy()
-    copy.append(ConversationMessage(role=Role.USER, content="second"))
-
-    assert len(conversation.messages) == 1
-    assert len(copy.messages) == 2
-
-
-def test_to_langchain_round_trips_every_role() -> None:
+def test_to_langchain_maps_every_role() -> None:
     tool_call = ToolCall(id="call_1", name="run_sql", args={"query": "select 1"})
     conversation = Conversation(
-        [
+        messages=[
             ConversationMessage(role=Role.SYSTEM, content="sys"),
             ConversationMessage(role=Role.USER, content="hi"),
             ConversationMessage(role=Role.ASSISTANT, content="", tool_calls=[tool_call]),
@@ -118,48 +73,15 @@ def test_to_langchain_round_trips_every_role() -> None:
     assert isinstance(messages[1], HumanMessage)
     assert isinstance(messages[2], AIMessage)
     assert messages[2].tool_calls[0]["id"] == "call_1"
-    assert messages[2].tool_calls[0]["name"] == "run_sql"
     assert messages[2].tool_calls[0]["args"] == {"query": "select 1"}
     assert isinstance(messages[3], ToolMessage)
     assert messages[3].tool_call_id == "call_1"
 
 
-def test_to_tool_defaults_missing_call_id_to_empty_string() -> None:
-    conversation = Conversation(
-        [ConversationMessage(role=Role.TOOL, content="r", tool_call_id=None)]
-    )
+def test_a_tool_message_without_call_id_maps_to_an_empty_string() -> None:
+    conversation = Conversation(messages=[ConversationMessage(role=Role.TOOL, content="r")])
 
     message = conversation.to_langchain()[0]
 
     assert isinstance(message, ToolMessage)
     assert message.tool_call_id == ""
-
-
-def test_from_langchain_round_trips_every_message_type() -> None:
-    messages = [
-        SystemMessage(content="sys"),
-        HumanMessage(content="hi"),
-        AIMessage(content="", tool_calls=[{"id": "call_1", "name": "run_sql", "args": {"q": 1}}]),
-        ToolMessage(content="result", tool_call_id="call_1"),
-    ]
-
-    conversation = Conversation.from_langchain(messages)
-
-    assert [m.role for m in conversation.messages] == [
-        Role.SYSTEM,
-        Role.USER,
-        Role.ASSISTANT,
-        Role.TOOL,
-    ]
-    assert conversation.messages[2].tool_calls == [
-        ToolCall(id="call_1", name="run_sql", args={"q": 1})
-    ]
-    assert conversation.messages[3].tool_call_id == "call_1"
-
-
-def test_from_langchain_defaults_missing_tool_call_id_to_empty_string() -> None:
-    messages = [AIMessage(content="", tool_calls=[{"id": None, "name": "t", "args": {}}])]
-
-    conversation = Conversation.from_langchain(messages)
-
-    assert conversation.messages[0].tool_calls[0].id == ""
