@@ -12,6 +12,7 @@ from agent_orchestrator.domain.conversation.message import Message, Speaker
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.outcome import Outcome
+from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.turn.verdict import Verdict
 from tests.agent_orchestrator.application.fakes import (
@@ -161,3 +162,14 @@ async def test_a_failed_summary_keeps_the_history(logger) -> None:
 
     assert len(conversation.messages) == 6
     assert logger.messages("warning")
+
+
+async def test_a_plan_runs_at_once_when_the_user_auto_approves() -> None:
+    conversation, current = Conversation("c1"), turn(Intent.TASK)
+    current.options = TurnOptions(auto_approve=True)
+
+    await PlanStep(FakePlanner("1. echo"), FakeCatalog(ECHO)).run(conversation, current)
+
+    assert current.plan is not None and current.plan.steps == "1. echo"
+    assert current.answer is None
+    assert conversation.pending_plan is None

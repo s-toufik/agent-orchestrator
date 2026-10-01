@@ -8,6 +8,7 @@ from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.feedback import Feedback
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.plan import Plan
+from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.turn.verdict import Verdict
@@ -20,6 +21,7 @@ class Turn:
     request: str
     model: str
     settings: TurnSettings = field(default_factory=TurnSettings)
+    options: TurnOptions = field(default_factory=TurnOptions)
     understanding: Understanding | None = None
     plan: Plan | None = None
     work: list[WorkItem] = field(default_factory=list)
@@ -31,7 +33,10 @@ class Turn:
         self.understanding = understanding
 
     def execute(self, plan: Plan) -> None:
+        # What was done before the plan was approved is not part of carrying it out.
         self.plan = plan
+        self.work = []
+        self.verdicts = []
 
     def drafted(self, draft: Draft) -> None:
         self.work.append(draft)

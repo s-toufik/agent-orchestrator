@@ -72,3 +72,12 @@ async def test_an_unknown_model_is_reported_without_running_a_turn(logger) -> No
     assert runner.turns == []
     assert events.events[0].kind is TurnEventKind.FAILED
     assert events.completed
+
+
+async def test_the_auto_approve_choice_reaches_the_turn(logger) -> None:
+    runner = RecordingRunner()
+    request = AgentRequest(message="go", model_name="m", request_id="c1", auto_approve=True)
+
+    await HandleMessage(runner, FakeModels(), logger).handle(request, ListEventStream())
+
+    assert runner.turns[0][1].options.auto_approve is True

@@ -11,6 +11,7 @@ from agent_orchestrator.domain.exception.agent_unavailable_exception import (
     AgentUnavailableException,
 )
 from agent_orchestrator.domain.turn.turn import Turn
+from agent_orchestrator.domain.turn.turn_options import TurnOptions
 
 AGENT_UNAVAILABLE_MESSAGE: str = (
     "The assistant is temporarily unavailable due to repeated upstream "
@@ -32,6 +33,7 @@ class HandleMessage:
                 request=request.message,
                 model=request.model_name,
                 settings=self._models.turn_settings(request.model_name),
+                options=TurnOptions(auto_approve=request.auto_approve),
             )
             async for event in self._workflow.run(request.request_id, turn):
                 await events.publish(event)

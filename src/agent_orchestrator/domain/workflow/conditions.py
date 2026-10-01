@@ -14,6 +14,10 @@ def needs_plan(turn: Turn) -> bool:
     return turn.intent is None or turn.intent.needs_plan
 
 
+def has_approved_plan(turn: Turn) -> bool:
+    return turn.plan is not None
+
+
 def is_ambiguous(turn: Turn) -> bool:
     return turn.intent is Intent.AMBIGUOUS
 

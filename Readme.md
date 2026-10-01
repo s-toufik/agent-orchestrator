@@ -49,7 +49,7 @@ tools is skipped with a warning; its tools appear after a restart.
 ### The request
 
 ```json
-{ "message": "how many users signed up today?", "model_name": "qwen3-8b", "request_id": "conversation-id" }
+{ "message": "how many users signed up today?", "model_name": "qwen3-8b", "request_id": "conversation-id", "auto_approve": false }
 ```
 
 | Field | Meaning |
@@ -57,6 +57,7 @@ tools is skipped with a warning; its tools appear after a restart.
 | `message` | what you say (non-empty) |
 | `model_name` | the model that answers; one of the models in `config/<env>/operation/llm.yml` |
 | `request_id` | the conversation id. Send the same value for every message of one conversation; a new value starts a new, empty conversation |
+| `auto_approve` | optional, default `false`. When `true`, a plan is carried out as soon as it is written instead of waiting for your "yes" |
 
 You can change `model_name` from one message to the next in the same conversation.
 

@@ -4,6 +4,7 @@ from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Message, Speaker
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.intent import Intent
+from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.understanding import Understanding
 from tests.agent_orchestrator.domain.builders import PLAN, turn
 
@@ -73,3 +74,24 @@ def test_compacting_keeps_only_the_last_messages_and_the_summary() -> None:
 
     assert conversation.summary == "earlier: 0, 1"
     assert conversation.messages == messages[2:]
+
+
+def test_a_submitted_plan_waits_for_the_user_by_default() -> None:
+    conversation, current = Conversation(id="c1"), turn(Intent.TASK)
+
+    conversation.submit(current, PLAN)
+
+    assert conversation.pending_plan == PLAN
+    assert current.plan is None
+    assert current.answer == Answer.approval_request(PLAN)
+
+
+def test_with_auto_approve_a_submitted_plan_is_carried_out_at_once() -> None:
+    conversation, current = Conversation(id="c1"), turn(Intent.TASK)
+    current.options = TurnOptions(auto_approve=True)
+
+    conversation.submit(current, PLAN)
+
+    assert conversation.pending_plan is None
+    assert current.plan == PLAN
+    assert current.answer is None

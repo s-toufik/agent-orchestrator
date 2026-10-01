@@ -36,6 +36,7 @@ from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.outcome import Outcome
 from agent_orchestrator.domain.turn.turn import Turn
+from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.workflow.step import Step
@@ -94,8 +95,15 @@ class Agent:
         )
         self.events: list[TurnEvent] = []
 
-    async def say(self, message: str, settings: TurnSettings | None = None) -> TurnEvent:
-        turn = Turn(message, "m", settings or TurnSettings(max_steps=6))
+    async def say(
+        self, message: str, settings: TurnSettings | None = None, auto_approve: bool = False
+    ) -> TurnEvent:
+        turn = Turn(
+            message,
+            "m",
+            settings or TurnSettings(max_steps=6),
+            options=TurnOptions(auto_approve=auto_approve),
+        )
         self.events = [event async for event in self._run(turn)]
         return self.events[-1]
 
@@ -320,3 +328,58 @@ async def test_a_request_misread_as_direct_gets_a_plan_in_the_same_turn(
 
     assert answer.answer is not None and answer.answer.text == "It lists changes."
     assert agent.executor.calls[0].name == "echo"
+
+
+@RUNNERS
+async def test_with_auto_approve_a_task_is_planned_and_carried_out_in_one_turn(
+    runner_kind, logger
+) -> None:
+    agent = Agent(
+        runner_kind,
+        logger,
+        understandings=[_understood(Intent.TASK, "say hi")],
+        plans=["## Plan\n1. echo hi (tool: echo)"],
+        drafts=[_calls("echo"), Draft("echo said hi")],
+        verdicts=[accept()],
+    )
+
+    answer = await agent.say("say hi", auto_approve=True)
+
+    assert answer.answer is not None
+    assert (answer.answer.text, answer.answer.outcome) == ("echo said hi", Outcome.ANSWERED)
+    assert agent.entered() == [
+        Step.UNDERSTAND,
+        Step.PLAN,
+        Step.ACT,
+        Step.RUN_TOOLS,
+        Step.ACT,
+        Step.REVIEW,
+        Step.FINISH,
+        Step.SUMMARIZE,
+    ]
+    assert (await agent.stored()).pending_plan is None
+
+
+@RUNNERS
+async def test_with_auto_approve_a_request_misread_as_direct_still_ends_with_the_tool_result(
+    runner_kind, logger
+) -> None:
+    agent = Agent(
+        runner_kind,
+        logger,
+        understandings=[_understood(Intent.DIRECT, "explain change.md")],
+        plans=["## Plan\n1. read change.md (tool: echo)"],
+        drafts=[
+            Draft.asking_for_plan("read change.md"),
+            _calls("echo"),
+            Draft("It lists changes."),
+        ],
+        verdicts=[accept()],
+    )
+
+    answer = await agent.say("explain change.md", auto_approve=True)
+
+    assert answer.answer is not None and answer.answer.text == "It lists changes."
+    assert agent.executor.calls[0].name == "echo"
+    executed: Turn = agent.actor.calls[1][1]
+    assert executed.plan is not None and executed.work == []

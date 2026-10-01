@@ -84,3 +84,14 @@ def test_a_plan_request_is_neither_an_answer_nor_tool_calls() -> None:
     assert request.asks_for_plan and request.plan_request == "read the report"
     assert not request.asks_for_tools
     assert not answer().asks_for_plan
+
+
+def test_carrying_out_a_plan_starts_from_fresh_work() -> None:
+    current = turn(Intent.DIRECT)
+    current.drafted(Draft.asking_for_plan("read the report"))
+    current.reviewed(accept())
+
+    current.execute(PLAN)
+
+    assert current.plan == PLAN
+    assert current.work == [] and current.verdicts == []

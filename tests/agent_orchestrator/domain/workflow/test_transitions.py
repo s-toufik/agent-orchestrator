@@ -16,7 +16,7 @@ POLICY = TurnPolicy()
         (Step.UNDERSTAND, [Step.PLAN, Step.CLARIFY, Step.ACT]),
         (Step.ACT, [Step.PLAN, Step.FINISH, Step.RUN_TOOLS, Step.REVIEW]),
         (Step.REVIEW, [Step.FEEDBACK, Step.FINISH]),
-        (Step.PLAN, [Step.FINISH]),
+        (Step.PLAN, [Step.ACT, Step.FINISH]),
         (Step.CLARIFY, [Step.FINISH]),
         (Step.RUN_TOOLS, [Step.ACT]),
         (Step.FEEDBACK, [Step.ACT]),
@@ -53,3 +53,11 @@ def test_conditions_read_the_turn() -> None:
     assert conditions.asks_for_plan_without_one(asking)
     assert conditions.retry_allowed(rejected)
     assert conditions.always(turn())
+
+
+def test_a_plan_approved_in_the_turn_is_carried_out_and_a_proposed_one_ends_it() -> None:
+    proposed = turn(Intent.TASK)
+    approved = turn(Intent.TASK, plan=PLAN)
+
+    assert POLICY.next(Step.PLAN, proposed) == Step.FINISH
+    assert POLICY.next(Step.PLAN, approved) == Step.ACT
