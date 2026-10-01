@@ -8,10 +8,15 @@ import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
+from agent_orchestrator.adapter.outbound.langgraph.graph.agent_graph_builder import (
+    AgentGraphBuilder,
+)
+from agent_orchestrator.adapter.outbound.langgraph.graph.policy_router import PolicyRouter
 from agent_orchestrator.adapter.outbound.langgraph.langgraph_workflow_runner import (
     LangGraphWorkflowRunner,
 )
-from agent_orchestrator.adapter.outbound.langgraph.turn_state_codec import TurnStateCodec
+from agent_orchestrator.adapter.outbound.langgraph.node.agent_nodes import agent_nodes
+from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import TurnStateCodec
 from agent_orchestrator.application.step.act_step import ActStep
 from agent_orchestrator.application.step.clarify_step import ClarifyStep
 from agent_orchestrator.application.step.feedback_step import FeedbackStep
@@ -19,6 +24,7 @@ from agent_orchestrator.application.step.finish_step import FinishStep
 from agent_orchestrator.application.step.plan_step import PlanStep
 from agent_orchestrator.application.step.review_step import ReviewStep
 from agent_orchestrator.application.step.run_tools_step import RunToolsStep
+from agent_orchestrator.application.step.step_handler import StepHandler
 from agent_orchestrator.application.step.summarize_step import SummarizeStep
 from agent_orchestrator.application.step.understand_step import UnderstandStep
 from agent_orchestrator.domain.conversation.conversation import Conversation
@@ -84,7 +90,7 @@ class Agent:
         self.runner = (
             InMemoryWorkflowRunner(steps, policy)
             if runner_kind == "memory"
-            else LangGraphWorkflowRunner(steps, policy, logger, InMemorySaver())
+            else _langgraph(steps, logger, InMemorySaver())
         )
         self.events: list[TurnEvent] = []
 
@@ -110,6 +116,12 @@ class Agent:
 
 
 RUNNERS = pytest.mark.parametrize("runner_kind", ["memory", "langgraph"])
+
+
+def _langgraph(steps: list[StepHandler], logger, checkpointer) -> LangGraphWorkflowRunner:
+    codec, policy = TurnStateCodec(), TurnPolicy()
+    builder = AgentGraphBuilder(agent_nodes(steps, codec), policy, PolicyRouter(policy, codec))
+    return LangGraphWorkflowRunner(builder.build(checkpointer), logger)
 
 
 def _understood(intent: Intent, query: str = "the query", **fields) -> Understanding:
@@ -258,7 +270,7 @@ async def test_a_thread_stored_in_an_older_format_starts_a_new_conversation(logg
     config = {"configurable": {"thread_id": CONVERSATION}}
     await old.compile(checkpointer=saver).ainvoke({"state": {}}, config)
     agent = Agent("langgraph", logger, [_understood(Intent.DIRECT, "hello")], drafts=[Draft("hi")])
-    agent.runner = LangGraphWorkflowRunner(agent.steps, TurnPolicy(), logger, saver)
+    agent.runner = _langgraph(agent.steps, logger, saver)
 
     answer = await agent.say("hello")
 

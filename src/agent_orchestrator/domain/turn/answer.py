@@ -15,7 +15,6 @@ APPROVAL_REQUEST: str = "{steps}\n\n---\nReply **yes** to run this plan, or tell
 
 @dataclass(frozen=True, slots=True)
 class Answer:
-
     text: str
     outcome: Outcome
 

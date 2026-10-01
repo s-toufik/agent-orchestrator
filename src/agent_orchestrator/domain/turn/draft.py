@@ -8,7 +8,6 @@ from agent_orchestrator.domain.tool.tool_call import ToolCall
 
 @dataclass(frozen=True, slots=True)
 class Draft:
-
     text: str
     tool_calls: tuple[ToolCall, ...] = field(default_factory=tuple)
     plan_request: str | None = None

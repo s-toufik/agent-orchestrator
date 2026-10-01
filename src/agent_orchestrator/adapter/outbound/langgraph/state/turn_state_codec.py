@@ -1,18 +1,13 @@
-from typing import Any, TypedDict
+from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
+from agent_orchestrator.adapter.outbound.langgraph.state.graph_state import GraphState
 from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.turn.turn import Turn
 
 
-class GraphState(TypedDict):
-    conversation: dict[str, Any]
-    turn: dict[str, Any]
-
-
 class TurnStateCodec:
-
     def __init__(self) -> None:
         self._conversation = TypeAdapter(Conversation)
         self._turn = TypeAdapter(Turn)

@@ -17,7 +17,6 @@ WorkItem = Draft | ToolResult | Feedback
 
 @dataclass
 class Turn:
-
     request: str
     model: str
     settings: TurnSettings = field(default_factory=TurnSettings)

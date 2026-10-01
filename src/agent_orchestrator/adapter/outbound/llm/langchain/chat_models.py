@@ -6,7 +6,6 @@ from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole, Mod
 
 
 class ChatModels:
-
     def __init__(self, catalog: ModelCatalog, http_client: AsyncClient | None = None) -> None:
         self._catalog = catalog
         self._http_client = http_client

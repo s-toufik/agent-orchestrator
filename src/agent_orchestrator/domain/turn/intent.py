@@ -2,7 +2,6 @@ from enum import StrEnum
 
 
 class Intent(StrEnum):
-
     TASK = "task"
     CONTINUATION = "continuation"
     DIRECT = "direct"

@@ -1,60 +1,45 @@
-from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.turn import Turn
+from agent_orchestrator.domain.workflow.conditions import (
+    asks_for_plan_without_one,
+    asks_for_tools,
+    asks_for_tools_out_of_steps,
+    is_ambiguous,
+    is_plain_direct_answer,
+    needs_plan,
+    retry_allowed,
+)
 from agent_orchestrator.domain.workflow.step import Step
+from agent_orchestrator.domain.workflow.transition import Transition
 
 FIRST_STEP: Step = Step.UNDERSTAND
 
 
 class TurnPolicy:
+    # Read top to bottom: after a step, the first transition whose condition holds is taken.
+    TRANSITIONS: tuple[Transition, ...] = (
+        Transition(Step.UNDERSTAND, Step.PLAN, needs_plan),
+        Transition(Step.UNDERSTAND, Step.CLARIFY, is_ambiguous),
+        Transition(Step.UNDERSTAND, Step.ACT),
+        Transition(Step.PLAN, Step.FINISH),
+        Transition(Step.CLARIFY, Step.FINISH),
+        Transition(Step.ACT, Step.PLAN, asks_for_plan_without_one),
+        Transition(Step.ACT, Step.FINISH, asks_for_tools_out_of_steps),
+        Transition(Step.ACT, Step.RUN_TOOLS, asks_for_tools),
+        Transition(Step.ACT, Step.FINISH, is_plain_direct_answer),
+        Transition(Step.ACT, Step.REVIEW),
+        Transition(Step.RUN_TOOLS, Step.ACT),
+        Transition(Step.REVIEW, Step.FEEDBACK, retry_allowed),
+        Transition(Step.REVIEW, Step.FINISH),
+        Transition(Step.FEEDBACK, Step.ACT),
+        Transition(Step.FINISH, Step.SUMMARIZE),
+        Transition(Step.SUMMARIZE, Step.END),
+    )
 
     def next(self, done: Step, turn: Turn) -> Step:
-        match done:
-            case Step.UNDERSTAND:
-                return self._after_understanding(turn)
-            case Step.ACT:
-                return self._after_action(turn)
-            case Step.REVIEW:
-                return self._after_review(turn)
-            case Step.RUN_TOOLS | Step.FEEDBACK:
-                return Step.ACT
-            case Step.PLAN | Step.CLARIFY:
-                return Step.FINISH
-            case Step.FINISH:
-                return Step.SUMMARIZE
-            case _:
-                return Step.END
+        for transition in self.TRANSITIONS:
+            if transition.source is done and transition.when(turn):
+                return transition.target
+        raise ValueError(f"No transition leaves the step '{done}'")
 
-    @staticmethod
-    def _after_understanding(turn: Turn) -> Step:
-        intent = turn.intent
-        if intent is None or intent.needs_plan:
-            return Step.PLAN
-        if intent is Intent.AMBIGUOUS:
-            return Step.CLARIFY
-        return Step.ACT
-
-    @staticmethod
-    def _after_action(turn: Turn) -> Step:
-        draft = turn.last_draft
-        if draft is not None and draft.asks_for_plan and turn.plan is None:
-            # The route had no tools: a plan is how the answer gets them.
-            return Step.PLAN
-        if draft is not None and draft.asks_for_tools:
-            if turn.steps_taken >= turn.settings.max_steps:
-                return Step.FINISH
-            return Step.RUN_TOOLS
-        if turn.is_plain_direct_answer:
-            return Step.FINISH
-        return Step.REVIEW
-
-    @staticmethod
-    def _after_review(turn: Turn) -> Step:
-        verdict = turn.last_verdict
-        if (
-            verdict is not None
-            and verdict.rejects
-            and turn.retries < turn.settings.max_retries
-            and turn.steps_taken < turn.settings.max_steps
-        ):
-            return Step.FEEDBACK
-        return Step.FINISH
+    def targets(self, source: Step) -> list[Step]:
+        return list(dict.fromkeys(t.target for t in self.TRANSITIONS if t.source is source))

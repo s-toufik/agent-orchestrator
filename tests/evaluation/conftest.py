@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_orchestrator.adapter.outbound.langgraph.turn_state_codec import TurnStateCodec
+from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import TurnStateCodec
 from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.outcome import Outcome

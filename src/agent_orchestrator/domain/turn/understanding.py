@@ -7,7 +7,6 @@ from agent_orchestrator.domain.turn.intent import Intent
 
 @dataclass(frozen=True, slots=True)
 class Understanding:
-
     intent: Intent
     query: str
     success_criteria: tuple[str, ...] = field(default_factory=tuple)

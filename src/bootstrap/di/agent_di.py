@@ -29,9 +29,15 @@ from pycraftcore.resilient_http.configuration import ResilientHttpSettings
 from pycraftcore.retry.configuration import RetrySettings
 from pymongo import MongoClient
 
+from agent_orchestrator.adapter.outbound.langgraph.graph.agent_graph_builder import (
+    AgentGraphBuilder,
+)
+from agent_orchestrator.adapter.outbound.langgraph.graph.policy_router import PolicyRouter
 from agent_orchestrator.adapter.outbound.langgraph.langgraph_workflow_runner import (
     LangGraphWorkflowRunner,
 )
+from agent_orchestrator.adapter.outbound.langgraph.node.agent_nodes import agent_nodes
+from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import TurnStateCodec
 from agent_orchestrator.adapter.outbound.llm.langchain.actor import LangChainActor
 from agent_orchestrator.adapter.outbound.llm.langchain.chat_models import ChatModels
 from agent_orchestrator.adapter.outbound.llm.langchain.context_window import ContextWindow
@@ -240,9 +246,12 @@ class AgentDI(BaseDI):
     async def _workflow_runner(
         self, toolbox: Toolbox, checkpointer: Any
     ) -> LangGraphWorkflowRunner:
-        return LangGraphWorkflowRunner(
-            self._steps(toolbox), TurnPolicy(), self._logging, checkpointer
-        )
+        return LangGraphWorkflowRunner(self._agent_graph(toolbox, checkpointer), self._logging)
+
+    def _agent_graph(self, toolbox: Toolbox, checkpointer: Any) -> Any:
+        codec, policy = TurnStateCodec(), TurnPolicy()
+        nodes = agent_nodes(self._steps(toolbox), codec)
+        return AgentGraphBuilder(nodes, policy, PolicyRouter(policy, codec)).build(checkpointer)
 
     def _steps(self, toolbox: Toolbox) -> list[StepHandler]:
         models, window, logger = self._chat_models, ContextWindow(), self._logging

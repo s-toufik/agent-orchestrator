@@ -11,7 +11,6 @@ class VerdictAction(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class Verdict:
-
     action: VerdictAction
     critique: str = ""
 

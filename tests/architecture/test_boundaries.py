@@ -67,3 +67,15 @@ def test_outbound_adapters_never_import_inbound_adapters() -> None:
 
 def test_the_agent_never_imports_a_toolbox_package_directly() -> None:
     assert _violations(PACKAGE, {"toolbox", "agent_toolbox"}) == []
+
+
+def test_langgraph_nodes_only_delegate_to_the_application() -> None:
+    # Models and tools are reached through the steps' ports, never from a graph node.
+    forbidden = {
+        "agent_orchestrator.adapter.outbound.llm",
+        "agent_orchestrator.adapter.outbound.tool",
+        "langchain",
+        "langchain_core",
+        "langchain_openai",
+    }
+    assert _violations(PACKAGE / "adapter" / "outbound" / "langgraph", forbidden) == []
