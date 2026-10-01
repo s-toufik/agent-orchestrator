@@ -166,7 +166,8 @@ async def test_an_unexpected_error_yields_an_error_frame_then_reraises(logger) -
             chunks.append(chunk.decode("utf-8"))
 
     assert len(chunks) == 1
-    assert "event: final" in chunks[0]
+    assert "event: error" in chunks[0]
     payload = json.loads(chunks[0].split("\n")[1].removeprefix("data: "))
-    assert "queue broke" in payload["error"]
+    assert payload["type"] == "error"
+    assert "queue broke" in payload["content"]
     assert logger.messages("error")

@@ -14,7 +14,6 @@ STEP_STATUS: dict[Step, str] = {
 
 
 class SsePresenter:
-    """Turns what happens in a turn into the SSE events homelab-ui reads."""
 
     def present(self, event: TurnEvent, session_id: str) -> list[bytes]:
         match event.kind:
@@ -31,8 +30,8 @@ class SsePresenter:
         return _stream(MessageStreamType.COMPLETE, "")
 
     @staticmethod
-    def error(session_id: str, trace: str) -> bytes:
-        return AgentMessageSchema(session_id=session_id, content="", error=trace).serialize()
+    def error(trace: str) -> bytes:
+        return _stream(MessageStreamType.ERROR, trace)
 
     @staticmethod
     def _status(event: TurnEvent) -> str | None:

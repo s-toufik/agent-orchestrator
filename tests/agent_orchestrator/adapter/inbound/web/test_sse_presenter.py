@@ -81,3 +81,7 @@ def test_a_failure_is_an_error_event() -> None:
 
 def test_the_stream_ends_with_complete() -> None:
     assert _frames([PRESENTER.complete()]) == [("complete", {"type": "complete", "content": ""})]
+
+
+def test_a_streaming_failure_is_an_error_event_the_ui_shows() -> None:
+    assert _frames([PRESENTER.error("trace")]) == [("error", {"type": "error", "content": "trace"})]

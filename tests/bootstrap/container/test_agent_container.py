@@ -30,6 +30,7 @@ def _base_env(monkeypatch, tmp_path):
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 def make_settings() -> ProcessSettings:

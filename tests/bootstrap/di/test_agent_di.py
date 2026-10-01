@@ -26,22 +26,16 @@ REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 @pytest.fixture(autouse=True)
 def _base_env(monkeypatch, tmp_path):
-    # The real config tree interpolates these with no default, so every test
-    # that loads real configuration (i.e. everything except the fake-config
-    # ones) needs them present -- individual tests can still override them.
     monkeypatch.setenv("USER_DB_HOST", str(tmp_path))
     monkeypatch.setenv("USER_DB_NAME", "users")
     monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", str(tmp_path))
     monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "checkpoint")
-    # The mongodb_checkpointer connector is also eagerly resolved when the
-    # config tree loads, even though most of these tests never touch it --
-    # _mongo_connection() then fails to actually connect and falls back to
-    # sqlite, which is what these tests expect.
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PORT", "27017")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 def make_settings(tmp_path: Path | None = None) -> ProcessSettings:

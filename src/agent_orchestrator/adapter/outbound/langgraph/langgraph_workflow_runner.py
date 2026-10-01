@@ -11,7 +11,6 @@ from agent_orchestrator.domain.turn.turn import Turn
 
 
 class LangGraphWorkflowRunner:
-
     def __init__(self, graph: Any, logger: Logger) -> None:
         self._graph = graph
         self._logger = logger

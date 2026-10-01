@@ -21,6 +21,7 @@ def _base_env(monkeypatch, tmp_path):
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 def make_settings() -> ProcessSettings:
@@ -32,13 +33,6 @@ def make_settings() -> ProcessSettings:
 
 
 def test_full_lifespan_includes_the_booted_routers_and_reports_healthy(monkeypatch) -> None:
-    # The real end-to-end boot (real toolbox, real sqlite, real graph
-    # building) is already proven directly against AgentContainer in
-    # tests/bootstrap/container/test_agent_container.py. This test is only
-    # for _lifespan's own wiring -- does it call boot(), include whatever
-    # routers boot() produced, and report healthy -- so boot() is stubbed
-    # rather than driving a real network call through TestClient's own
-    # blocking portal thread.
     from fastapi import APIRouter
 
     fake_router = APIRouter(prefix="/fake")
@@ -60,10 +54,13 @@ def test_full_lifespan_includes_the_booted_routers_and_reports_healthy(monkeypat
 
     with TestClient(app) as client:
         health = client.get("/actuator/health")
+        readiness = client.get("/actuator/health/readiness")
         fake = client.get("/fake/ping")
 
     assert health.status_code == 200
     assert health.json() == {"status": "UP"}
+    assert readiness.status_code == 200
+    assert readiness.json() == {"status": "UP"}
     assert fake.status_code == 200
     assert fake.json() == {"pong": True}
 

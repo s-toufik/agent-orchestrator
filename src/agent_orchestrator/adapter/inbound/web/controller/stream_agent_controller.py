@@ -82,7 +82,7 @@ class StreamAgentController:
         except Exception as exception:
             trace: str = "".join(traceback.format_exception(exception))
             self._logger.error(f"unhandled streaming error:\n{trace}")
-            yield self._presenter.error(request.request_id, trace)
+            yield self._presenter.error(trace)
             raise
         finally:
             await self._cancel(use_case_task)

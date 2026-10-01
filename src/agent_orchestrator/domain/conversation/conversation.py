@@ -12,7 +12,6 @@ from agent_orchestrator.domain.turn.understanding import Understanding
 
 @dataclass
 class Conversation:
-
     id: str
     messages: list[Message] = field(default_factory=list)
     summary: str = ""

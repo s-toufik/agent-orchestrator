@@ -22,6 +22,7 @@ def _set_required_env(monkeypatch) -> None:
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "test-checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 class RecordingClient:
