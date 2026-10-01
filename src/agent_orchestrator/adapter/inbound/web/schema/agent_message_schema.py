@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
-from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
-from agent_orchestrator.domain.enum.agent_message_type import AgentMessageType
+from agent_orchestrator.adapter.inbound.web.schema.agent_message_type import AgentMessageType
+from agent_orchestrator.adapter.inbound.web.schema.message_stream_type import MessageStreamType
 
 
 class AgentMessageSchema(BaseModel):

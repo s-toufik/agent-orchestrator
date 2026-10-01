@@ -42,9 +42,6 @@ check:
 run:
 	uv run uvicorn bootstrap.application.agent_application:app --host 0.0.0.0 --port 8000
 
-run_sdk:
-	AGENT_ENGINE=anthropic_sdk uv run uvicorn bootstrap.application.agent_application:app --host 0.0.0.0 --port 8000
-
 clean:
 	rm -rf dist src/*.egg-info
 

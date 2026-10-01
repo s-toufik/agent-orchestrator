@@ -5,7 +5,7 @@ import pytest
 from agent_orchestrator.adapter.inbound.web.schema.agent_message_stream_schema import (
     AgentMessageStreamSchema,
 )
-from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
+from agent_orchestrator.adapter.inbound.web.schema.message_stream_type import MessageStreamType
 
 
 @pytest.mark.parametrize("stream_type", list(MessageStreamType))

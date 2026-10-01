@@ -15,8 +15,8 @@ from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool_provider import McpTo
 from agent_orchestrator.adapter.outbound.tool.mcp.streamable_http_session_factory import (
     StreamableHttpSessionFactory,
 )
-from agent_orchestrator.domain.model.tool_invocation import ToolInvocation
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_call import ToolCall
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 from tests.support.mcp_test_server import build_mcp_asgi_app, build_mcp_server
 
 
@@ -101,25 +101,25 @@ async def test_provider_carries_each_tools_input_and_output_schema(running_serve
 async def test_prefers_structured_content_when_present(running_server, logger) -> None:
     tool = _tool(running_server, "structured", logger)
 
-    outcome = await tool.invoke(ToolInvocation(id="1", name="structured"))
+    result = await tool.invoke(ToolCall(id="1", name="structured"))
 
-    assert not outcome.error
-    assert outcome.output == '{"rows": [{"n": 1}]}'
+    assert not result.error
+    assert result.output == '{"rows": [{"n": 1}]}'
 
 
 async def test_falls_back_to_text_when_no_structured_content(running_server, logger) -> None:
     tool = _tool(running_server, "unstructured", logger)
 
-    outcome = await tool.invoke(ToolInvocation(id="1", name="unstructured"))
+    result = await tool.invoke(ToolCall(id="1", name="unstructured"))
 
-    assert not outcome.error
-    assert outcome.output == "plain text"
+    assert not result.error
+    assert result.output == "plain text"
 
 
 async def test_failure_still_reads_the_text_error_message(running_server, logger) -> None:
     tool = _tool(running_server, "always_fails", logger)
 
-    outcome = await tool.invoke(ToolInvocation(id="1", name="always_fails"))
+    result = await tool.invoke(ToolCall(id="1", name="always_fails"))
 
-    assert outcome.error
-    assert "boom" in outcome.error
+    assert result.error
+    assert "boom" in result.error

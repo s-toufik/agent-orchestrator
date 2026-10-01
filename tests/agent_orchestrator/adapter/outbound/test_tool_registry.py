@@ -1,11 +1,10 @@
 import pytest
 
-from agent_orchestrator.adapter.outbound.langgraph.service.tool_mapper import to_langchain_tools
 from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
 from agent_orchestrator.domain.exception.unknown_tool_exception import UnknownToolException
-from agent_orchestrator.domain.model.tool_invocation import ToolInvocation
-from agent_orchestrator.domain.model.tool_outcome import ToolOutcome
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_call import ToolCall
+from agent_orchestrator.domain.tool.tool_result import ToolResult
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 
 class StubTool:
@@ -18,8 +17,8 @@ class StubTool:
     def specification(self) -> ToolSpecification:
         return self._specification
 
-    async def invoke(self, invocation: ToolInvocation) -> ToolOutcome:  # pragma: no cover
-        return ToolOutcome(invocation_id=invocation.id, tool_name=invocation.name, output="")
+    async def invoke(self, call: ToolCall) -> ToolResult:  # pragma: no cover
+        return ToolResult(call_id=call.id, tool_name=call.name, output="")
 
 
 def test_lookup_by_name() -> None:
@@ -34,11 +33,3 @@ def test_unknown_tool_raises_a_domain_exception() -> None:
 
     with pytest.raises(UnknownToolException):
         registry.get("missing")
-
-
-def test_specifications_map_to_the_bind_tools_shape() -> None:
-    registry = ToolRegistry([StubTool("a")])
-
-    bound = to_langchain_tools(registry.specifications())
-
-    assert bound == [{"name": "a", "description": "a tool.", "parameters": {"type": "object"}}]

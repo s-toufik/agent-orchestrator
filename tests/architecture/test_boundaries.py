@@ -1,8 +1,6 @@
 import ast
 from pathlib import Path
 
-import pytest
-
 SOURCE = Path(__file__).resolve().parents[2] / "src"
 PACKAGE = SOURCE / "agent_orchestrator"
 
@@ -14,8 +12,6 @@ FRAMEWORKS = {
     "langchain_core",
     "langchain_openai",
     "langgraph",
-    "claude_agent_sdk",
-    "anthropic",
     "pymongo",
     "pydantic",
     "httpx",
@@ -69,51 +65,5 @@ def test_outbound_adapters_never_import_inbound_adapters() -> None:
     assert _violations(PACKAGE / "adapter" / "outbound", forbidden) == []
 
 
-@pytest.mark.parametrize(
-    ("engine", "forbidden"),
-    [
-        (
-            "langgraph",
-            {
-                "claude_agent_sdk",
-                "anthropic",
-                "agent_orchestrator.adapter.outbound.anthropic_sdk",
-                "agent_orchestrator.adapter.outbound.llm.lite_llm",
-            },
-        ),
-        (
-            "anthropic_sdk",
-            {
-                "langchain",
-                "langchain_core",
-                "langchain_openai",
-                "langgraph",
-                "agent_orchestrator.adapter.outbound.langgraph",
-                "agent_orchestrator.adapter.outbound.llm.langchain",
-                "agent_orchestrator.adapter.outbound.tool",
-            },
-        ),
-    ],
-)
-def test_agent_engines_are_independent(engine: str, forbidden: set[str]) -> None:
-    assert _violations(PACKAGE / "adapter" / "outbound" / engine, forbidden) == []
-
-
 def test_the_agent_never_imports_a_toolbox_package_directly() -> None:
     assert _violations(PACKAGE, {"toolbox", "agent_toolbox"}) == []
-
-
-@pytest.mark.parametrize("engine", ["langgraph", "anthropic_sdk"])
-def test_an_engine_port_package_holds_only_interfaces(engine: str) -> None:
-    port = PACKAGE / "adapter" / "outbound" / engine / "port"
-    classes = [
-        (path.name, node)
-        for path in port.rglob("*.py")
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.ClassDef)
-    ]
-
-    assert classes, f"{port} declares no interface"
-    for file_name, node in classes:
-        bases = {base.id for base in node.bases if isinstance(base, ast.Name)}
-        assert "Protocol" in bases, f"{file_name}: {node.name} is not a Protocol"

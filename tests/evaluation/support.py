@@ -1,16 +1,11 @@
 from deepeval.test_case import ToolCall
 
-from agent_orchestrator.adapter.outbound.langgraph.enum.role import Role
-from agent_orchestrator.adapter.outbound.langgraph.store.agent_state import AgentState
+from agent_orchestrator.domain.turn.turn import Turn
 
 
-def tools_called(state: AgentState) -> list[ToolCall]:
-    return [
-        ToolCall(name=call.name)
-        for message in state.turn.scratch.of_role(Role.ASSISTANT)
-        for call in message.tool_calls
-    ]
+def tools_called(turn: Turn) -> list[ToolCall]:
+    return [ToolCall(name=call.name) for draft in turn.drafts for call in draft.tool_calls]
 
 
-def retrieval_context(state: AgentState) -> list[str]:
-    return [message.content for message in state.turn.scratch.of_role(Role.TOOL)]
+def retrieval_context(turn: Turn) -> list[str]:
+    return [result.content for result in turn.evidence]

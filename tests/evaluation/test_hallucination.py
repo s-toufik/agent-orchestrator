@@ -12,7 +12,7 @@ async def test_answer_does_not_contradict_a_known_fact(run_agent, judge_model) -
 
     test_case = LLMTestCase(
         input=question,
-        actual_output=message.content,
+        actual_output=message.text,
         context=["12 multiplied by 7 equals 84."],
     )
     metric = HallucinationMetric(model=judge_model, threshold=0.5)

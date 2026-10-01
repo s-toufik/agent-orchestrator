@@ -1,6 +1,6 @@
 from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort
 from agent_orchestrator.domain.exception.unknown_tool_exception import UnknownToolException
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 
 class ToolRegistry:

@@ -1,23 +1,18 @@
 from typing import Protocol, runtime_checkable
 
-from agent_orchestrator.domain.model.tool_invocation import ToolInvocation
-from agent_orchestrator.domain.model.tool_outcome import ToolOutcome
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_call import ToolCall
+from agent_orchestrator.domain.tool.tool_result import ToolResult
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 
 @runtime_checkable
 class ToolPort(Protocol):
+    """One callable tool, whatever serves it (an MCP server today)."""
+
     @property
     def specification(self) -> ToolSpecification: ...
 
-    async def invoke(self, invocation: ToolInvocation) -> ToolOutcome: ...
-
-
-@runtime_checkable
-class ToolRegistryPort(Protocol):
-    def get(self, name: str) -> ToolPort: ...
-
-    def specifications(self) -> list[ToolSpecification]: ...
+    async def invoke(self, call: ToolCall) -> ToolResult: ...
 
 
 @runtime_checkable

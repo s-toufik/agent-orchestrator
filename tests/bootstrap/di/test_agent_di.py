@@ -14,9 +14,12 @@ from pycraftcore.application_configuration.model.connector import (
 from pycraftcore.application_configuration.model.operation import OperationRegistry
 from pycraftcore.authentication.model.no_auth import NoAuth
 
+from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
+from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
+from agent_orchestrator.adapter.outbound.tool.toolbox import Toolbox
+from agent_orchestrator.domain.workflow.step import Step
 from bootstrap.configuration.settings import ProcessSettings
-from bootstrap.di.agent_di import EXTERNAL_MCP_PREFIX, MCP_CONNECTOR_NAME, AgentDI, AgentRole
-from bootstrap.di.langgraph_di import LangGraphDI
+from bootstrap.di.agent_di import EXTERNAL_MCP_PREFIX, MCP_CONNECTOR_NAME, AgentDI
 
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
@@ -147,15 +150,15 @@ class _AdvertisedTool:
         self.output_schema = None
 
 
-async def test_tool_registry_discovers_tools_from_the_mcp_server() -> None:
+async def test_toolbox_discovers_tools_from_the_mcp_server() -> None:
     di = AgentDI(make_settings())
     di.__dict__["_mcp_session_factories"] = {
         "toolbox": _FakeMcpSessionFactory([_AdvertisedTool("echo", "Echoes.", {"type": "object"})]),
     }
 
-    registry = await di._tool_registry()
+    toolbox = await di._toolbox()
 
-    assert [spec.name for spec in registry.specifications()] == ["echo"]
+    assert [spec.name for spec in toolbox.tools()] == ["echo"]
 
 
 class _UnreachableMcpSessionFactory:
@@ -165,7 +168,7 @@ class _UnreachableMcpSessionFactory:
         yield  # pragma: no cover
 
 
-async def test_tool_registry_skips_mcp_servers_that_are_down_or_advertise_nothing() -> None:
+async def test_toolbox_skips_mcp_servers_that_are_down_or_advertise_nothing() -> None:
     di = AgentDI(make_settings())
     di.__dict__["_mcp_session_factories"] = {
         "toolbox": _UnreachableMcpSessionFactory(),
@@ -175,25 +178,25 @@ async def test_tool_registry_skips_mcp_servers_that_are_down_or_advertise_nothin
         ),
     }
 
-    registry = await di._tool_registry()
+    toolbox = await di._toolbox()
 
-    assert [spec.name for spec in registry.specifications()] == ["echo"]
+    assert [spec.name for spec in toolbox.tools()] == ["echo"]
 
 
-async def test_tool_registry_is_empty_but_usable_when_no_mcp_server_answers() -> None:
+async def test_toolbox_is_empty_but_usable_when_no_mcp_server_answers() -> None:
     di = AgentDI(make_settings())
     di.__dict__["_mcp_session_factories"] = {"toolbox": _UnreachableMcpSessionFactory()}
 
-    registry = await di._tool_registry()
+    toolbox = await di._toolbox()
 
-    assert registry.specifications() == []
+    assert toolbox.tools() == []
 
 
 async def test_checkpointer_opens_a_real_sqlite_connection() -> None:
     # No real MongoDB is running, so _checkpointer() falls back to sqlite,
     # which is what this test is exercising. _base_env already sets the
     # sqlite/mongo env vars the config tree needs to resolve.
-    di = LangGraphDI(make_settings())
+    di = AgentDI(make_settings())
 
     checkpointer = await di._checkpointer()
 
@@ -201,50 +204,33 @@ async def test_checkpointer_opens_a_real_sqlite_connection() -> None:
     await di._stop_factories()
 
 
-def test_each_role_reads_its_model_from_agent_yml() -> None:
-    # Whatever agent.yml holds today: a named model is used, null means "follow the selection".
-    di = LangGraphDI(make_settings())
+def test_every_model_of_llm_yml_is_selectable_by_its_server_name() -> None:
+    di = AgentDI(make_settings())
+    operations = di._configuration.operation.by_name
+    roles = {role.value for role in AgentRole}
+    expected = {
+        str(operation.parameters.get("model") or name)
+        for name, operation in operations.items()
+        if name not in roles
+    }
+
+    assert set(di._model_catalog.models) == expected
+
+
+def test_only_the_roles_naming_a_model_in_agent_yml_are_frozen() -> None:
+    di = AgentDI(make_settings())
+    operations = di._configuration.operation.by_name
 
     for role in AgentRole:
-        configured = di._configuration.operation.api(role).parameters.get("model")
-        settings = di._role_settings(role)
-
-        assert (settings[1].model_name if settings else None) == configured, role
-
-
-def _freeze(monkeypatch, di: LangGraphDI, frozen: dict[AgentRole, str]) -> None:
-    # A role named here is frozen to that model; every other role is null.
-    def role_settings(role: AgentRole):
-        if role not in frozen:
-            return None
-        connector, parameters = di._model_settings(frozen[role])
-        return connector, parameters.model_copy(update={"max_iterations": 3})
-
-    monkeypatch.setattr(di, "_role_settings", role_settings)
+        configured = operations[role.value].parameters.get("model")
+        frozen = di._model_catalog.roles.get(role)
+        assert (frozen[1].model_name if frozen else None) == configured, role
 
 
-def test_a_null_role_follows_the_selection_and_a_frozen_one_does_not(monkeypatch) -> None:
-    di = LangGraphDI(make_settings())
-    _freeze(monkeypatch, di, {AgentRole.CONTEXT: "qwen3-8b"})
+async def test_the_workflow_graph_has_one_node_per_step() -> None:
+    di = AgentDI(make_settings())
+    runner = await di._workflow_runner(Toolbox(ToolRegistry([]), di._logging), checkpointer=None)
 
-    context = di._llm_for_role(AgentRole.CONTEXT, "qwen3-14b")
-    act = di._llm_for_role(AgentRole.ACT, "qwen3-14b")
+    nodes = set(runner.graph.get_graph().nodes) - {"__start__", "__end__"}
 
-    assert context.model_name == "qwen3-8b"
-    assert act.model_name == "qwen3-14b"
-    assert not context.streaming and not act.streaming
-
-
-def test_a_frozen_act_ignores_the_selection_and_sets_the_turn_budget(monkeypatch) -> None:
-    di = LangGraphDI(make_settings())
-    _freeze(monkeypatch, di, {AgentRole.ACT: "qwen3-8b"})
-    captured: dict = {}
-    monkeypatch.setattr(
-        "bootstrap.di.langgraph_di.build_agent", lambda **kwargs: captured.update(kwargs)
-    )
-
-    di._build_graph("qwen3-14b", checkpointer=None, tool_registry=None)
-
-    assert captured["act_llm"].model_name == "qwen3-8b"
-    assert captured["plan_llm"].model_name == "qwen3-14b"
-    assert captured["model_parameters"].max_iterations == 3
+    assert nodes == {step.value for step in Step if step is not Step.END}

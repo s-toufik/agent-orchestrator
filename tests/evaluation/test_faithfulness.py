@@ -14,7 +14,7 @@ async def test_answer_is_faithful_to_the_tools_own_output(run_agent, judge_model
 
     test_case = LLMTestCase(
         input=question,
-        actual_output=message.content,
+        actual_output=message.text,
         retrieval_context=retrieval_context(state),
     )
     metric = FaithfulnessMetric(model=judge_model, threshold=0.5)

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from agent_orchestrator.domain.model.agent_request import AgentRequest
+from agent_orchestrator.application.port.inbound.agent_request import AgentRequest
 
 
 class AgentRequestSchema(BaseModel):

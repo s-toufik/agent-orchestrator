@@ -4,7 +4,7 @@ from agent_orchestrator.adapter.outbound.tool.mcp.mcp_session_factory import Mcp
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool import McpTool
 from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort
 from agent_orchestrator.domain.exception.tool_unavailable_exception import ToolUnavailableException
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 
 class McpToolProvider:

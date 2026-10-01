@@ -1,7 +1,6 @@
 import asyncio
 import socket
 from collections.abc import AsyncIterator
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -10,7 +9,7 @@ from pycraftcore.application_configuration.enum import ConnectorType
 from pycraftcore.application_configuration.model.connector import McpConnector
 from pycraftcore.authentication.model.no_auth import NoAuth
 
-from bootstrap.configuration.settings import AgentEngine, ProcessSettings
+from bootstrap.configuration.settings import ProcessSettings
 from bootstrap.container.agent_container import AgentContainer
 from tests.support.mcp_test_server import build_mcp_asgi_app, build_mcp_server
 
@@ -110,22 +109,3 @@ async def test_stop_after_boot_does_not_raise(running_toolbox, monkeypatch) -> N
     await container.boot()
 
     await container.stop()  # must not raise
-
-
-@pytest.mark.parametrize(
-    ("engine", "builder"),
-    [
-        (AgentEngine.LANGGRAPH, "_langgraph_agent"),
-        (AgentEngine.ANTHROPIC_SDK, "_anthropic_sdk_agent"),
-    ],
-)
-async def test_the_configured_engine_builds_the_agent(monkeypatch, engine, builder) -> None:
-    sentinel = object()
-
-    async def build(self):
-        return sentinel
-
-    monkeypatch.setattr(AgentContainer, builder, build)
-    container = AgentContainer(replace(make_settings(), engine=engine))
-
-    assert await container._agent() is sentinel

@@ -1,5 +1,5 @@
 from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
-from agent_orchestrator.domain.model.agent_request import AgentRequest
+from agent_orchestrator.application.port.inbound.agent_request import AgentRequest
 
 
 def test_to_domain_maps_every_field() -> None:

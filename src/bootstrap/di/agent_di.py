@@ -1,9 +1,12 @@
+import asyncio
 from collections.abc import Mapping
-from enum import StrEnum
 from functools import cached_property
+from typing import Any
 
 import aiosqlite
 from httpx import AsyncClient
+from langgraph.checkpoint.mongodb import MongoDBSaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pycraftcore.application_configuration.enum import ConnectorType
 from pycraftcore.application_configuration.model.connector import (
     ApiConnector,
@@ -26,14 +29,46 @@ from pycraftcore.resilient_http.configuration import ResilientHttpSettings
 from pycraftcore.retry.configuration import RetrySettings
 from pymongo import MongoClient
 
+from agent_orchestrator.adapter.outbound.langgraph.langgraph_workflow_runner import (
+    LangGraphWorkflowRunner,
+)
+from agent_orchestrator.adapter.outbound.llm.langchain.actor import LangChainActor
+from agent_orchestrator.adapter.outbound.llm.langchain.chat_models import ChatModels
+from agent_orchestrator.adapter.outbound.llm.langchain.context_window import ContextWindow
+from agent_orchestrator.adapter.outbound.llm.langchain.intent_classifier import (
+    LangChainIntentClassifier,
+)
+from agent_orchestrator.adapter.outbound.llm.langchain.planner import LangChainPlanner
+from agent_orchestrator.adapter.outbound.llm.langchain.reviewer import LangChainReviewer
+from agent_orchestrator.adapter.outbound.llm.langchain.summarizer import LangChainSummarizer
+from agent_orchestrator.adapter.outbound.llm.langchain.token_counter import (
+    EstimatedTokenCounter,
+)
 from agent_orchestrator.adapter.outbound.llm.mapper import ModelSettingsMapper
-from agent_orchestrator.adapter.outbound.llm.schema import ModelConnector, ModelParameters
+from agent_orchestrator.adapter.outbound.llm.model_catalog import (
+    AgentRole,
+    ModelCatalog,
+    ModelSettings,
+)
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool_provider import McpToolProvider
 from agent_orchestrator.adapter.outbound.tool.mcp.streamable_http_session_factory import (
     StreamableHttpSessionFactory,
 )
-from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort, ToolRegistryPort
+from agent_orchestrator.adapter.outbound.tool.tool_port import ToolPort
 from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
+from agent_orchestrator.adapter.outbound.tool.toolbox import Toolbox
+from agent_orchestrator.application.step.act_step import ActStep
+from agent_orchestrator.application.step.clarify_step import ClarifyStep
+from agent_orchestrator.application.step.feedback_step import FeedbackStep
+from agent_orchestrator.application.step.finish_step import FinishStep
+from agent_orchestrator.application.step.plan_step import PlanStep
+from agent_orchestrator.application.step.review_step import ReviewStep
+from agent_orchestrator.application.step.run_tools_step import RunToolsStep
+from agent_orchestrator.application.step.step_handler import StepHandler
+from agent_orchestrator.application.step.summarize_step import SummarizeStep
+from agent_orchestrator.application.step.understand_step import UnderstandStep
+from agent_orchestrator.application.use_case.handle_message import HandleMessage
+from agent_orchestrator.domain.workflow.turn_policy import TurnPolicy
 from bootstrap.di.base_di import BaseDI
 
 MCP_CONNECTOR_NAME: str = "toolbox"
@@ -42,27 +77,10 @@ LLM_CONNECTOR_NAME: str = "llm"
 MONGODB_CONNECTOR_NAME: str = "mongodb_checkpointer"
 SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
 
-MODEL_ALIASES: dict[str, str] = {
-    "qwen3-8b": "qwen3-8b",
-    "qwen3.5-0.8b": "qwen3_5-0_8b",
-    "qwen3-1.7b": "qwen3-1_7b",
-    "qwen3.5-2b": "qwen3_5-2b",
-    "lfm2-8b-a1b": "lfm2-8b-a1b",
-    "ministral-8b-instruct-2410": "ministral-8b-instruct-2410",
-    "gigachat3.1-10b-a1.8b": "gigachat3_1-10b-a1_8b",
-    "qwen3-14b": "qwen3-14b",
-}
-
-
-class AgentRole(StrEnum):
-    ACT = "agent_act"
-    CONTEXT = "agent_context"
-    PLAN = "agent_plan"
-    REFLECTION = "agent_reflection"
-    SUMMARY = "agent_summary"
-
 
 class AgentDI(BaseDI):
+    """Wiring only: configuration in, adapters, steps, runner and use case out."""
+
     # ------------------------------------------------------------------ tools
     @cached_property
     def _mcp_connectors(self) -> dict[str, McpConnector]:
@@ -82,13 +100,13 @@ class AgentDI(BaseDI):
     async def _close_mcp_session_factories(self) -> None:
         self.__dict__.pop("_mcp_session_factories", None)
 
-    async def _tool_registry(self) -> ToolRegistryPort:
+    async def _toolbox(self) -> Toolbox:
         tools: list[ToolPort] = []
         for name, factory in self._mcp_session_factories.items():
             tools.extend(await self._discover_tools(name, factory))
         if not tools:
             self._logging.warning("No MCP tools available: the agent will answer without tools")
-        return ToolRegistry(tools)
+        return Toolbox(ToolRegistry(tools), self._logging)
 
     async def _discover_tools(
         self, name: str, factory: StreamableHttpSessionFactory
@@ -146,19 +164,55 @@ class AgentDI(BaseDI):
         if client is not None:
             await client.aclose()
 
-    def _model_settings(self, model_name: str) -> tuple[ModelConnector, ModelParameters]:
-        operation: ApiOperation = self._configuration.operation.api(model_name)
-        return ModelSettingsMapper(operation)()
+    @cached_property
+    def _model_catalog(self) -> ModelCatalog:
+        # Every API operation is a selectable model, except the agent roles of agent.yml.
+        roles: set[str] = {role.value for role in AgentRole}
+        models: dict[str, ModelSettings] = {}
+        for name, operation in self._configuration.operation.by_name.items():
+            if name in roles or not isinstance(operation, ApiOperation):
+                continue
+            connector, parameters = ModelSettingsMapper(operation)()
+            models[parameters.model_name] = (connector, parameters)
+        return ModelCatalog(models=models, roles=self._frozen_roles())
 
-    def _role_settings(self, role: AgentRole) -> tuple[ModelConnector, ModelParameters] | None:
-        operation: ApiOperation = self._configuration.operation.api(role)
-        if operation.parameters.get("model") is None:
-            return None
-        return ModelSettingsMapper(operation)()
+    def _frozen_roles(self) -> dict[AgentRole, ModelSettings]:
+        # A role with `model: null` is left out: it follows the model selected for the turn.
+        frozen: dict[AgentRole, ModelSettings] = {}
+        for role in AgentRole:
+            operation = self._configuration.operation.by_name.get(role.value)
+            if isinstance(operation, ApiOperation) and operation.parameters.get("model"):
+                frozen[role] = ModelSettingsMapper(operation)()
+        return frozen
 
-    # --------------------------------------------------------------- database
+    @cached_property
+    def _chat_models(self) -> ChatModels:
+        return ChatModels(self._model_catalog, self._llm_http_client)
+
+    # ------------------------------------------------------------ persistence
     def _database_connector(self, connector_name: str) -> DatabaseConnector:
         return self._configuration.connector.database(connector_name)
+
+    async def _checkpointer(self) -> AsyncSqliteSaver | MongoDBSaver:
+        mongo_saver: MongoDBSaver | None = await self._mongodb_checkpointer()
+        if mongo_saver is not None:
+            self._logging.info("Using MongoDB checkpointer with TTL")
+            return mongo_saver
+
+        self._logging.info("Using Sqlite checkpointer with no TTL")
+        return AsyncSqliteSaver(await self._sqlite_connection(SQLITE_CHECKPOINTER))
+
+    async def _mongodb_checkpointer(self) -> MongoDBSaver | None:
+        client = await self._mongo_connection(MONGODB_CONNECTOR_NAME)
+        if client is None:
+            return None
+        connector: DatabaseConnector = self._database_connector(MONGODB_CONNECTOR_NAME)
+        return await asyncio.to_thread(
+            MongoDBSaver,
+            client,
+            db_name=connector.default_name,
+            ttl=connector.pool.get("ttl", 3600),
+        )
 
     async def _sqlite_connection(self, connector_name: str) -> aiosqlite.Connection:
         connector = self._database_connector(connector_name)
@@ -177,3 +231,29 @@ class AgentDI(BaseDI):
             self._logging.warning(f"MongoDB '{connector_name}' unavailable: {exception}")
             await factory.disconnect()
             return None
+
+    # --------------------------------------------------------------- workflow
+    async def _handle_message(self) -> HandleMessage:
+        runner = await self._workflow_runner(await self._toolbox(), await self._checkpointer())
+        return HandleMessage(runner, self._model_catalog, self._logging)
+
+    async def _workflow_runner(
+        self, toolbox: Toolbox, checkpointer: Any
+    ) -> LangGraphWorkflowRunner:
+        return LangGraphWorkflowRunner(
+            self._steps(toolbox), TurnPolicy(), self._logging, checkpointer
+        )
+
+    def _steps(self, toolbox: Toolbox) -> list[StepHandler]:
+        models, window, logger = self._chat_models, ContextWindow(), self._logging
+        return [
+            UnderstandStep(LangChainIntentClassifier(models, window, logger), logger),
+            PlanStep(LangChainPlanner(models, window, logger), toolbox),
+            ClarifyStep(),
+            ActStep(LangChainActor(models, window, logger), toolbox),
+            RunToolsStep(toolbox),
+            ReviewStep(LangChainReviewer(models, logger), logger),
+            FeedbackStep(logger),
+            FinishStep(),
+            SummarizeStep(LangChainSummarizer(models, logger), EstimatedTokenCounter(), logger),
+        ]

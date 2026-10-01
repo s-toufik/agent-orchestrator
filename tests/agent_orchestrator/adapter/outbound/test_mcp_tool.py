@@ -2,7 +2,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import Any
 
 from agent_orchestrator.adapter.outbound.tool.mcp.mcp_tool import McpTool
-from agent_orchestrator.domain.model.tool_specification import ToolSpecification
+from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 SPEC = ToolSpecification(name="run_sql", description="SQL.", parameters={"type": "object"})
 

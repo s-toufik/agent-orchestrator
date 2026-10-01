@@ -5,22 +5,21 @@ from pathlib import Path
 
 import pytest
 
-from agent_orchestrator.adapter.outbound.langgraph.enum.turn_outcome import TurnOutcome
-from agent_orchestrator.adapter.outbound.langgraph.langgraph_agent import LangGraphAgent
-from agent_orchestrator.adapter.outbound.langgraph.store.agent_state import AgentState
-from agent_orchestrator.adapter.outbound.langgraph.store.state_serialization import unpack_state
-from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
-from agent_orchestrator.domain.model.agent_request import AgentRequest
+from agent_orchestrator.adapter.outbound.langgraph.turn_state_codec import TurnStateCodec
+from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
+from agent_orchestrator.domain.turn.answer import Answer
+from agent_orchestrator.domain.turn.outcome import Outcome
+from agent_orchestrator.domain.turn.turn import Turn
 from bootstrap.configuration.settings import ProcessSettings
-from bootstrap.di.langgraph_di import LangGraphDI
+from bootstrap.di.agent_di import AgentDI
 from tests.evaluation.local_judge_model import LocalJudgeModel
 
 pytestmark = pytest.mark.evaluation
 
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
-EVAL_MODEL: str = os.getenv("EVAL_MODEL", "gpt_oss_20b")
+EVAL_MODEL: str = os.getenv("EVAL_MODEL", "qwen3-14b")
 
-RunAgent = Callable[[str], Awaitable[tuple[AgentMessageStream, AgentState]]]
+RunAgent = Callable[[str], Awaitable[tuple[Answer, Turn]]]
 
 
 def _settings(role: str) -> ProcessSettings:
@@ -43,8 +42,8 @@ def _base_env(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-async def agent_di(_base_env) -> AsyncIterator[LangGraphDI]:
-    di = LangGraphDI(_settings("agent-orchestrator"))
+async def agent_di(_base_env) -> AsyncIterator[AgentDI]:
+    di = AgentDI(_settings("agent-orchestrator"))
     try:
         yield di
     finally:
@@ -54,28 +53,30 @@ async def agent_di(_base_env) -> AsyncIterator[LangGraphDI]:
 
 
 @pytest.fixture
-def judge_model(agent_di: LangGraphDI) -> LocalJudgeModel:
-    return LocalJudgeModel(agent_di._llm_for_model(EVAL_MODEL, use_streaming=False))
+def judge_model(agent_di: AgentDI) -> LocalJudgeModel:
+    return LocalJudgeModel(agent_di._chat_models.for_role(AgentRole.ACT, EVAL_MODEL))
 
 
 @pytest.fixture
-async def run_agent(agent_di: LangGraphDI) -> RunAgent:
-    checkpointer = await agent_di._checkpointer()
-    tool_registry = await agent_di._tool_registry()
-    graph = agent_di._build_graph(EVAL_MODEL, checkpointer, tool_registry)
-    agent = LangGraphAgent({EVAL_MODEL: graph})
+async def run_agent(agent_di: AgentDI) -> RunAgent:
+    runner = await agent_di._workflow_runner(
+        await agent_di._toolbox(), await agent_di._checkpointer()
+    )
+    settings = agent_di._model_catalog.turn_settings(EVAL_MODEL)
+    codec = TurnStateCodec()
 
-    async def _final(message: str, request_id: str) -> AgentMessageStream:
-        request = AgentRequest(message=message, model_name=EVAL_MODEL, request_id=request_id)
-        events = [event async for event in agent.stream(request)]
-        return events[-1]
+    async def _turn(message: str, conversation_id: str) -> Turn:
+        async for _ in runner.run(conversation_id, Turn(message, EVAL_MODEL, settings)):
+            pass
+        snapshot = await runner.graph.aget_state({"configurable": {"thread_id": conversation_id}})
+        return codec.decode_turn(snapshot.values)
 
-    async def _run(question: str) -> tuple[AgentMessageStream, AgentState]:
-        request_id = str(uuid.uuid4())
-        message = await _final(question, request_id)
-        if message.metadata.get("outcome") == TurnOutcome.AWAITING_APPROVAL:
-            message = await _final("yes", request_id)
-        snapshot = await graph.aget_state({"configurable": {"thread_id": request_id}})
-        return message, unpack_state(snapshot.values)
+    async def _run(question: str) -> tuple[Answer, Turn]:
+        conversation_id = str(uuid.uuid4())
+        turn = await _turn(question, conversation_id)
+        if turn.answer is not None and turn.answer.outcome is Outcome.AWAITING_APPROVAL:
+            turn = await _turn("yes", conversation_id)
+        assert turn.answer is not None
+        return turn.answer, turn
 
     return _run

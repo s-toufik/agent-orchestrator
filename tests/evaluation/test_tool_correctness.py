@@ -14,7 +14,7 @@ async def test_agent_uses_the_python_tool_for_arithmetic(run_agent, judge_model)
 
     test_case = LLMTestCase(
         input=question,
-        actual_output=message.content,
+        actual_output=message.text,
         tools_called=tools_called(state),
         expected_tools=[ToolCall(name="python_executor")],
     )
@@ -32,7 +32,7 @@ async def test_agent_writes_then_reads_back_a_file(run_agent, judge_model) -> No
 
     test_case = LLMTestCase(
         input=question,
-        actual_output=message.content,
+        actual_output=message.text,
         tools_called=tools_called(state),
         expected_tools=[ToolCall(name="file_writer"), ToolCall(name="file_reader")],
     )

@@ -1,4 +1,13 @@
 connector:
+#  llm_provider:
+#    name: llm_provider
+#    type: api
+#    base_url: ${oc.env:LLM_BASE_URL}
+#    timeout: 5
+#    retry: 3
+#    auth:
+#      type: none
+
   llm_provider:
     name: llm_provider
     type: api
@@ -6,4 +15,9 @@ connector:
     timeout: 5
     retry: 3
     auth:
-      type: none
+      type: token
+      key_name: apikey
+      key_value: ${oc.env:LLM_NVIDIA_PROVIDER}
+
+
+

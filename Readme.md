@@ -15,8 +15,7 @@ Its tools come from one or more MCP servers reached over HTTP: by default the
 - Python 3.14 and [uv](https://docs.astral.sh/uv/)
 - An OpenAI-compatible model server (llama.cpp, vLLM, LM Studio…) at `LLM_BASE_URL`
 - Optional: an MCP server at `TOOLBOX_URL` (the agent still starts without one)
-- Conversation storage: MongoDB, or a local SQLite file (the `langgraph` engine falls back
-  to SQLite when MongoDB is unreachable; the `anthropic_sdk` engine needs MongoDB)
+- Conversation storage: MongoDB, or a local SQLite file used when MongoDB is unreachable
 
 ---
 
@@ -32,8 +31,7 @@ cp .env.example .env      # then fill in the URLs and paths
 ## Running it
 
 ```bash
-make run        # LangGraph engine (default)
-make run_sdk    # Claude Agent SDK engine
+make run
 ```
 
 | | URL |
@@ -98,31 +96,10 @@ Questions that need no tools ("what is VaR?") are answered straight away. Follow
 
 ---
 
-## Agent engines
-
-`AGENT_ENGINE` picks the engine. Both serve the same API, follow the same routes (plan
-first, tools only after approval, a check of the answer) and read the same configuration.
-
-| | `langgraph` (default) | `anthropic_sdk` |
-|---|---|---|
-| Streaming | the accepted answer, in one piece | live, token by token; `reset` clears a draft that gets replaced |
-| Storage | MongoDB, SQLite fallback | MongoDB only |
-| Load | light | one Claude Code process per live conversation: keep `MAX_CONCURRENT_STREAMS` low |
-| Built-in file tools | — | optional, see `AGENT_SDK_TOOLS` |
-
-The `anthropic_sdk` engine speaks the Anthropic Messages API. Because the models are served
-with the OpenAI convention, the agent starts a LiteLLM gateway that translates between the
-two, and stops it on shutdown. Locally it runs through `uvx`; the Docker image ships it. To
-do without it once the model server speaks Anthropic Messages: `LITELLM_ENABLED=false` and
-`ANTHROPIC_BASE_URL`.
-
----
-
 ## Environment variables
 
 `.env.example` lists them all, grouped. Variables marked **required** are read by the
-configuration files and must be present, even when the engine you run does not use them
-(an empty value is fine there).
+configuration files and must be present (an empty value is fine when the feature is unused).
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -130,25 +107,12 @@ configuration files and must be present, even when the engine you run does not u
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. Each line shows the request id (`-` outside a request) |
 | `CONFIGURATION_DIR` | `./config` | where `config/` is |
 | `DEPLOYMENT_ENVIRONMENT` | `unknown` | label put on telemetry |
-| `AGENT_ENGINE` | `langgraph` | `langgraph` or `anthropic_sdk` |
 | `MAX_CONCURRENT_STREAMS` | `200` | open streams accepted at once; above it the API answers 503 |
 | `LLM_BASE_URL` | **required** | the OpenAI-compatible model server, e.g. `http://sirius:8090/v1` |
 | `TOOLBOX_URL` | **required** | the MCP server, e.g. `http://127.0.0.1:8001/mcp` |
 | `DB_MONGO_CHECKPOINT_HOST` / `_PORT` / `_NAME` / `_USERNAME` / `_PASSWORD` | **required** | conversation storage in MongoDB |
-| `DB_SQLITE_CHECKPOINT_HOST` / `_NAME` | **required** | SQLite fallback (folder + file name), used by `langgraph` only |
+| `DB_SQLITE_CHECKPOINT_HOST` / `_NAME` | **required** | SQLite fallback (folder + file name), used when MongoDB is unreachable |
 | `OTEL_HOST` / `OTEL_PORT` | **required** | OpenTelemetry collector (gRPC, usually port `4317`); empty host = telemetry off |
-
-`anthropic_sdk` engine only:
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `WORKING_DIRECTORY` | `./working_directory` | the agent's working directory: the only place its built-in file tools can reach. Use the same path on every instance. Mount the toolbox's `WORKING_DIRECTORY` volume at the same path to share files |
-| `AGENT_SDK_TOOLS` | empty | built-in file tools, usable only after a plan is approved: any of `Read`, `Write`, `Edit`, `Glob`, `Grep` (`Edit` requires `Read`) |
-| `LITELLM_ENABLED` | `true` | start the LiteLLM gateway |
-| `LITELLM_COMMAND` | `uvx --from litellm[proxy]==1.102.1 litellm` | how to launch LiteLLM |
-| `LITELLM_HOST` / `LITELLM_PORT` | `127.0.0.1` / `4000` | where it listens |
-| `ANTHROPIC_BASE_URL` | — | required when `LITELLM_ENABLED=false`: an Anthropic Messages endpoint |
-| `ANTHROPIC_AUTH_TOKEN` | `none` | token sent to that endpoint |
 
 ---
 
@@ -177,7 +141,7 @@ One entry per model. Parameters:
 | `max_context_tokens` | the model's context window | `8000` |
 | `max_iterations` | step budget per message (model calls while working with tools) | `10` |
 | `max_reflection_retries` | how many times a rejected answer is rewritten | `2` |
-| `use_streaming` | `langgraph`: send the accepted answer as a `token` event before `final` | `false` |
+| `use_streaming` | also send the accepted answer as a `token` event before `final` | `false` |
 | `reasoning_effort` | `null`: the model answers without thinking. `low`, `medium` or `high`: it thinks first (Qwen models; the level makes no difference for them, and models without a thinking mode ignore it). Thinking makes answers much slower and uses output tokens: give such a model `max_output_tokens` of 8000 or more | `null` |
 
 The models are the ones the homelab model server runs (`homelab-infra/llm/config.yml`):
@@ -187,10 +151,9 @@ The models are the ones the homelab model server runs (`homelab-infra/llm/config
 models under 3B), and `max_output_tokens` well below it.
 
 **Adding a model:** add its entry to `operation/llm.yml`, list it under `operation:` in
-`config/root.yml`, add it to `MODEL_ALIASES` in `src/bootstrap/di/agent_di.py` (the list of
-models requests may name), and to the model list of your UI. An entry's key cannot contain a
-dot: write `qwen3_5-2b` as the key and `model: qwen3.5-2b` (the name the server knows) in its
-parameters; `MODEL_ALIASES` maps the name requests use to that key.
+`config/root.yml`, and add it to the model list of your UI. Requests name a model by its
+`model` parameter, the name the model server knows. An entry's key cannot contain a dot:
+write `qwen3_5-2b` as the key and `model: qwen3.5-2b` in its parameters.
 
 ### Model per step (`operation/agent.yml`)
 
@@ -202,7 +165,7 @@ Each step that calls a model has an entry:
 | `agent_context` | understands each message and picks the route | `qwen3.5-0.8b` |
 | `agent_plan` | writes the plan | `qwen3-1.7b` |
 | `agent_reflection` | checks the answer before it is sent | `null` |
-| `agent_summary` | summarises long conversations (`langgraph` only) | `qwen3.5-0.8b` |
+| `agent_summary` | summarises long conversations | `qwen3.5-0.8b` |
 
 - `parameters.model: null`: the step uses the model named in the request (the one picked in
   the UI), with its `llm.yml` parameters.
@@ -299,7 +262,5 @@ uv run pre-commit run --all-files --hook-stage pre-commit
 make docker_build     # image agent:local
 ```
 
-The image listens on port 8000, reads its configuration from `/app/config` and ships
-LiteLLM for the `anthropic_sdk` engine. Set the environment variables above on the
-container; for `anthropic_sdk`, mount a volume at `WORKING_DIRECTORY`
-(`/data/working_directory` in the image).
+The image listens on port 8000 and reads its configuration from `/app/config`. Set the
+environment variables above on the container.
