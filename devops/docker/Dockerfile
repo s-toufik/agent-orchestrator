@@ -2,7 +2,7 @@ FROM python:3.14-slim AS builder
 
 RUN pip install --no-cache-dir uv
 
-WORKDIR /build
+WORKDIR /app
 COPY pyproject.toml uv.lock* ./
 COPY src ./src
 COPY Readme.md ./
@@ -14,7 +14,7 @@ FROM python:3.14-slim
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 
-COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 COPY src ./src
 COPY config ./config
 RUN cp -r config/debug config/deploy

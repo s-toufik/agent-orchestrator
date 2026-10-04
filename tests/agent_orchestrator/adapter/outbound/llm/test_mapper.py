@@ -3,17 +3,19 @@ from pycraftcore.application_configuration.model.connector import ApiConnector
 from pycraftcore.application_configuration.model.operation import ApiOperation
 from pycraftcore.authentication import NoAuth
 from pycraftcore.authentication.model.auth_type import AuthType
+from pycraftcore.authentication.model.token_auth import TokenAuth
 from pycraftcore.http.enum import HttpMethod
 from pydantic import SecretStr
 
+from agent_orchestrator.adapter.outbound.llm.enum.reasoning_effort import ReasoningEffort
 from agent_orchestrator.adapter.outbound.llm.mapper import ModelSettingsMapper
 
 
-def make_operation(parameters: dict) -> ApiOperation:
+def make_operation(parameters: dict, auth: NoAuth | TokenAuth | None = None) -> ApiOperation:
     connector = ApiConnector(
         name="conn",
         type=ConnectorType.api,
-        auth=NoAuth(type=AuthType.none),
+        auth=auth or NoAuth(type=AuthType.none),
         base_url="http://example.com",
         timeout=10,
         retry=1,
@@ -36,6 +38,13 @@ def test_maps_the_connector_base_url_and_a_placeholder_api_key() -> None:
     assert connector.api_key.get_secret_value() == "No_Key"
 
 
+def test_a_token_connector_passes_its_key_to_the_model_client() -> None:
+    auth = TokenAuth(type=AuthType.token, key_name="apikey", key_value="sk-test")
+    connector, _ = ModelSettingsMapper(make_operation({}, auth))()
+
+    assert connector.api_key.get_secret_value() == "sk-test"
+
+
 def test_defaults_every_parameter_when_absent() -> None:
     _, parameters = ModelSettingsMapper(make_operation({}))()
 
@@ -45,6 +54,7 @@ def test_defaults_every_parameter_when_absent() -> None:
     assert parameters.temperature == 0.0
     assert parameters.max_iterations == 10
     assert parameters.use_streaming is False
+    assert parameters.reasoning_effort is None
 
 
 def test_uses_explicit_parameters_when_present() -> None:
@@ -56,6 +66,7 @@ def test_uses_explicit_parameters_when_present() -> None:
                 "temperature": 0.7,
                 "max_iterations": 3,
                 "use_streaming": True,
+                "reasoning_effort": "medium",
             }
         )
     )()
@@ -65,3 +76,10 @@ def test_uses_explicit_parameters_when_present() -> None:
     assert parameters.temperature == 0.7
     assert parameters.max_iterations == 3
     assert parameters.use_streaming is True
+    assert parameters.reasoning_effort is ReasoningEffort.MEDIUM
+
+
+def test_a_null_reasoning_effort_means_the_model_does_not_reason() -> None:
+    _, parameters = ModelSettingsMapper(make_operation({"reasoning_effort": None}))()
+
+    assert parameters.reasoning_effort is None

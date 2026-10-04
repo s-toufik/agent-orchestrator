@@ -14,9 +14,6 @@ def make_settings(directory: Path, role: str = "agent-orchestrator") -> ProcessS
 
 
 def _set_required_env(monkeypatch) -> None:
-    # The real config tree interpolates these with no default -- they must be
-    # present for OmegaConf to resolve it at all, even though this test only
-    # cares about the mcp/operation values, not the database ones.
     monkeypatch.setenv("DB_SQLITE_CHECKPOINT_HOST", "/tmp")
     monkeypatch.setenv("DB_SQLITE_CHECKPOINT_NAME", "test-checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_HOST", "localhost")
@@ -24,6 +21,7 @@ def _set_required_env(monkeypatch) -> None:
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "test-checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 def test_loads_the_real_configuration_tree(logger, monkeypatch) -> None:

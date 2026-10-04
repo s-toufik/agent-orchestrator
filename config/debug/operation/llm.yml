@@ -1,14 +1,216 @@
 operation:
-  granite4-7b:
-    name: granite4-7b
+  qwen3-8b:
+    name: qwen3-8b
     connector: ${connector.llm_provider}
     type: api
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: ${operation.granite4-7b.name}
+      model: ${operation.qwen3-8b.name}
       temperature: 0.0
-      max_output_tokens: 8000
-      max_context_tokens: 8000
+      max_output_tokens: 4096
+      max_context_tokens: 16384
       max_iterations: 20
       use_streaming: true
+      reasoning_effort: null
+
+  qwen3_5-0_8b:
+    name: qwen3_5-0_8b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: qwen3.5-0.8b
+      temperature: 0.0
+      max_output_tokens: 8192
+      max_context_tokens: 32768
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  qwen3-1_7b:
+    name: qwen3-1_7b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: qwen3-1.7b
+      temperature: 0.0
+      max_output_tokens: 8192
+      max_context_tokens: 32768
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  qwen3_5-2b:
+    name: qwen3_5-2b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: qwen3.5-2b
+      temperature: 0.0
+      max_output_tokens: 8192
+      max_context_tokens: 32768
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  lfm2-8b-a1b:
+    name: lfm2-8b-a1b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.lfm2-8b-a1b.name}
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  ministral-8b-instruct-2410:
+    name: ministral-8b-instruct-2410
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.ministral-8b-instruct-2410.name}
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  gigachat3_1-10b-a1_8b:
+    name: gigachat3_1-10b-a1_8b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: gigachat3.1-10b-a1.8b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+
+  qwen3-14b:
+    name: qwen3-14b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: ${operation.qwen3-14b.name}
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      use_streaming: true
+      reasoning_effort: null
+  # ------------------------------------------- NVIDIA Models
+  nemotron-3-super-120b-a12b:
+    name: nemotron-3-super-120b-a12b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3-super-120b-a12b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  gpt-oss-20b:
+    name: gpt-oss-20b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: openai/gpt-oss-20b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  deepseek-v4_1-flash:
+    name: deepseek-v4_1-flash
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: deepseek-ai/deepseek-v4.1-flash
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  nemotron-3-ultra-550b-a55b:
+    name: nemotron-3-ultra-550b-a55b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3-ultra-550b-a55b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  nemotron-3_5-lightning-30b-a3b:
+    name: nemotron-3_5-lightning-30b-a3b
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3.5-lightning-30b-a3b
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  nemotron-3-nano-omni-30b-a3b-reasoning:
+    name: nemotron-3-nano-omni-30b-a3b-reasoning
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null

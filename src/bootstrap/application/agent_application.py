@@ -24,10 +24,12 @@ async def _lifespan(application: FastAPI, container: AgentContainer) -> AsyncGen
     for router in container.routers:
         application.include_router(router)
         container.logging.info(f"Router {router.prefix} included")
+    application.state.ready = container.is_ready
 
     try:
         yield
     finally:
+        application.state.ready = False
         await container.stop()
 
 
@@ -42,7 +44,6 @@ def create_agent_application(settings: ProcessSettings | None = None) -> FastAPI
 
     application.add_middleware(RequestIDMiddleware)
     application.add_middleware(RequestMiddleware)
-    # noinspection PyTypeChecker
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

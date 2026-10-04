@@ -22,14 +22,10 @@ def _set_required_env(monkeypatch) -> None:
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_NAME", "test-checkpoint")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_USERNAME", "test")
     monkeypatch.setenv("DB_MONGO_CHECKPOINT_PASSWORD", "test")
+    monkeypatch.setenv("LLM_API_KEY", "test")
 
 
 class RecordingClient:
-    """Implements AsyncHttpFactory. Only start()/close() are exercised by
-    _start_factories()/_stop_factories() (a hasattr-based duck-typed check),
-    but the type annotation is the full protocol, so the rest are unused stubs.
-    """
-
     def __init__(self) -> None:
         self.started = False
         self.closed = False
@@ -51,8 +47,6 @@ class RecordingClient:
 
 
 class RecordingRepository:
-    """Implements AsyncRepositoryFactory, for the same reason as above."""
-
     def __init__(self) -> None:
         self.connected = False
         self.disconnected = False
@@ -71,12 +65,7 @@ class RecordingRepository:
         raise AssertionError("not expected to be called")
 
 
-class NoLifecycleClient:
-    """Deliberately missing start()/close() -- proves _start_factories() and
-    _stop_factories()'s hasattr checks tolerate a registered object that
-    isn't fully AsyncHttpFactory-compliant, so it can't structurally satisfy
-    that protocol here without defeating the point of the test.
-    """
+class NoLifecycleClient: ...
 
 
 def test_register_client_returns_the_same_object_and_tracks_it() -> None:
@@ -136,21 +125,19 @@ def test_telemetry_provider_service_name_is_derived_from_the_role(monkeypatch) -
     provider = di._telemetry_provider
 
     assert provider is not None
-    # Without an otlp_endpoint this spins up a BatchSpanProcessor with a real
-    # background thread -- shut it down or it leaks across the whole suite.
     provider.shutdown()
 
 
 async def test_shutdown_telemetry_is_a_no_op_when_never_constructed() -> None:
     di = BaseDI(make_settings())
 
-    await di._shutdown_telemetry()  # must not raise
+    await di._shutdown_telemetry()
 
 
 async def test_shutdown_telemetry_shuts_down_and_evicts_the_cached_provider(monkeypatch) -> None:
     _set_required_env(monkeypatch)
     di = BaseDI(make_settings())
-    _ = di._telemetry_provider  # force construction
+    _ = di._telemetry_provider
     assert "_telemetry_provider" in di.__dict__
 
     await di._shutdown_telemetry()

@@ -25,7 +25,7 @@ dependencies = [
     "httpx2",
     "aiosqlite",
     "mcp",
-    "pycraftcore>=1.2.0",
+    "pycraftcore>=2.0.0",
     "pydantic>=2",
     "python-dotenv",
     "langchain",
@@ -57,6 +57,9 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+#[tool.uv.sources]
+#pycraftcore = { path = "../pycraftcore", editable = true }
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
@@ -83,3 +86,4 @@ exclude = [".venv", "tests"]
 
 [project.urls]
 Homepage = "https://github.com/s-toufik/agent-orchestrator"
+

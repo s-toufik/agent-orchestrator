@@ -9,101 +9,80 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
 
-from agent_orchestrator.adapter.inbound.web.schema.agent_message_schema import AgentMessageSchema
-from agent_orchestrator.adapter.inbound.web.schema.agent_message_stream_schema import (
-    AgentMessageStreamSchema,
-)
 from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
-from agent_orchestrator.application.port.inbound.stream_agent_port import StreamAgentPort
-from agent_orchestrator.application.port.outbound.sse_queue_port import SSEQueuePort
-from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
-from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
-from agent_orchestrator.domain.model.agent_request import AgentRequest
+from agent_orchestrator.adapter.inbound.web.sse_presenter import SsePresenter
+from agent_orchestrator.application.port.inbound.handle_message_port import HandleMessagePort
+from agent_orchestrator.application.port.outbound.turn_event_stream import TurnEventStream
 
 
 class StreamAgentController:
     def __init__(
         self,
-        use_case: StreamAgentPort,
-        stream_events: Callable[[], SSEQueuePort],
+        use_case: HandleMessagePort,
+        stream_events: Callable[[], TurnEventStream],
         logger: Logger,
         max_concurrent_streams: int = 200,
+        presenter: SsePresenter | None = None,
     ) -> None:
         self._use_case = use_case
         self._stream_events = stream_events
         self._logger = logger
         self._admission = asyncio.Semaphore(max_concurrent_streams)
+        self._presenter = presenter or SsePresenter()
 
     async def execute(self, request: AgentRequestSchema) -> StreamingResponse:
-        request_id: str = request.request_id or request_id_context.get() or "N/A"
-
         if request.request_id:
             request_id_context.set(request.request_id)
 
         if self._admission.locked():
-            self._logger.warning(f"[{request_id}] rejected: server at capacity")
+            self._logger.warning("rejected: server at capacity")
             raise HTTPException(status_code=503, detail="Server is at capacity, please retry.")
 
         await self._admission.acquire()
 
         try:
             starlette_request: Request | None = request_context.get() or None
-            self._logger.info(f"[{request_id}] stream request accepted")
-
-            domain_request: AgentRequest = request.to_domain()
-            events: SSEQueuePort = self._stream_events()
-
+            self._logger.info("stream request accepted")
+            events: TurnEventStream = self._stream_events()
             use_case_task: Task[None] = asyncio.create_task(
-                self._use_case.execute(domain_request, events)
+                self._use_case.handle(request.to_domain(), events)
             )
         except Exception:
             self._admission.release()
             raise
 
         return StreamingResponse(
-            self._event_generator(request_id, request, events, use_case_task, starlette_request),
+            self._event_generator(request, events, use_case_task, starlette_request),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
 
     async def _event_generator(
         self,
-        request_id: str,
         request: AgentRequestSchema,
-        events: SSEQueuePort,
+        events: TurnEventStream,
         use_case_task: Task[None],
         starlette_request: Request | None,
     ) -> AsyncIterator[bytes]:
         try:
+            stream = aiter(events)
             while True:
                 if starlette_request is not None and await starlette_request.is_disconnected():
                     raise asyncio.CancelledError
-
-                event: AgentMessageStream = await events.queue.get()
-
-                if event.type is MessageStreamType.FINAL:
-                    yield AgentMessageSchema(
-                        session_id=request.request_id,
-                        content=event.content,
-                        metadata=event.metadata,
-                    ).serialize()
-                else:
-                    yield AgentMessageStreamSchema(
-                        type=event.type, content=event.content
-                    ).serialize()
-
-                if event.type is MessageStreamType.COMPLETE:
+                event = await anext(stream, None)
+                if event is None:
                     break
+                for chunk in self._presenter.present(event, request.request_id):
+                    yield chunk
+            yield self._presenter.complete()
 
         except asyncio.CancelledError:
-            self._logger.warning(f"[{request_id}] stream cancelled by the client")
+            self._logger.warning("stream cancelled by the client")
             raise
         except Exception as exception:
-            traceback_str: str = "".join(traceback.format_exception(exception))
-            self._logger.error(f"[{request_id}] unhandled streaming error:\n{traceback_str}")
-            yield AgentMessageSchema(
-                session_id=request.request_id, content="", error=traceback_str
-            ).serialize()
+            trace: str = "".join(traceback.format_exception(exception))
+            self._logger.error(f"unhandled streaming error:\n{trace}")
+            yield self._presenter.error(trace)
             raise
         finally:
             await self._cancel(use_case_task)

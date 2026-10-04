@@ -1,6 +1,7 @@
 import asyncio
 import json
-from typing import Any, cast
+from collections.abc import AsyncIterator
+from typing import cast
 
 import pytest
 from starlette.exceptions import HTTPException
@@ -10,67 +11,67 @@ from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller i
     StreamAgentController,
 )
 from agent_orchestrator.adapter.inbound.web.schema.agent_request_schema import AgentRequestSchema
-from agent_orchestrator.domain.enum.agent_message_status import MessageStreamType
-from agent_orchestrator.domain.model.agent_message_stream import AgentMessageStream
+from agent_orchestrator.adapter.outbound.event.queue_turn_event_stream import QueueTurnEventStream
+from agent_orchestrator.domain.event.turn_event import TurnEvent
+from agent_orchestrator.domain.turn.answer import Answer
+from agent_orchestrator.domain.turn.turn import Turn
+from agent_orchestrator.domain.turn.turn_settings import TurnSettings
+from agent_orchestrator.domain.workflow.step import Step
 
 REQUEST = AgentRequestSchema(message="hi", model_name="m", request_id="r1")
 
 
-class FakeSSEQueue:
-    def __init__(self) -> None:
-        self.queue: asyncio.Queue[AgentMessageStream] = asyncio.Queue()
-
-    async def token(self, value: str) -> None: ...
-    async def final(self, value: str, metadata: dict | None = None) -> None: ...
-    async def error(self, value: str) -> None: ...
-    async def complete(self) -> None: ...
-
-
 class ScriptedUseCase:
-    def __init__(self, events: list[AgentMessageStream]) -> None:
+    def __init__(self, events: list[TurnEvent]) -> None:
         self._events = events
 
-    async def execute(self, request, events) -> None:
+    async def handle(self, request, events) -> None:
         for event in self._events:
-            await events.queue.put(event)
+            await events.publish(event)
+        await events.complete()
+
+
+def _finished(text: str) -> TurnEvent:
+    turn = Turn(request="hi", model="m", settings=TurnSettings(max_steps=6, stream_answer=True))
+    turn.finish(Answer.answered(text))
+    return TurnEvent.finished(turn)
 
 
 async def _drain(response) -> list[str]:
     return [chunk.decode("utf-8") async for chunk in response.body_iterator]
 
 
-async def test_a_normal_stream_yields_token_then_final_then_complete(logger) -> None:
-    events = [
-        AgentMessageStream(type=MessageStreamType.TOKEN, content="Hel"),
-        AgentMessageStream(type=MessageStreamType.TOKEN, content="lo"),
-        AgentMessageStream(
-            type=MessageStreamType.FINAL, content="Hello", metadata={"iteration": "1"}
-        ),
-        AgentMessageStream(type=MessageStreamType.COMPLETE, content=""),
-    ]
-    controller = StreamAgentController(ScriptedUseCase(events), FakeSSEQueue, logger)
+async def test_a_turn_streams_its_status_then_the_answer_then_complete(logger) -> None:
+    turn = Turn(request="hi", model="m")
+    events = [TurnEvent.entering(Step.UNDERSTAND, turn), _finished("Hello")]
+    controller = StreamAgentController(ScriptedUseCase(events), QueueTurnEventStream, logger)
 
     response = await controller.execute(REQUEST)
     chunks = await _drain(response)
 
-    assert "event: token" in chunks[0]
+    assert "event: status" in chunks[0] and "Understanding your request" in chunks[0]
+    assert "event: token" in chunks[1]
     assert "event: final" in chunks[2]
     final_payload = json.loads(chunks[2].split("\n")[1].removeprefix("data: "))
     assert final_payload["content"] == "Hello"
-    assert final_payload["metadata"] == {"iteration": "1"}
+    assert final_payload["session_id"] == "r1"
+    assert final_payload["metadata"] == {
+        "iteration": "0",
+        "max_iteration": "6",
+        "outcome": "answered",
+    }
     assert "event: complete" in chunks[3]
 
 
 async def test_admission_is_released_after_a_stream_completes(logger) -> None:
-    events = [AgentMessageStream(type=MessageStreamType.COMPLETE, content="")]
+    events: list[TurnEvent] = []
     controller = StreamAgentController(
-        ScriptedUseCase(events), FakeSSEQueue, logger, max_concurrent_streams=1
+        ScriptedUseCase(events), QueueTurnEventStream, logger, max_concurrent_streams=1
     )
 
     response = await controller.execute(REQUEST)
     await _drain(response)
 
-    # A second stream must be able to acquire the single permit again.
     response2 = await controller.execute(REQUEST)
     await _drain(response2)
 
@@ -86,14 +87,12 @@ async def test_admission_is_released_when_setup_itself_raises(logger) -> None:
     with pytest.raises(RuntimeError, match="queue construction failed"):
         await controller.execute(REQUEST)
 
-    # The permit must have been released, or a second call would hang forever
-    # waiting on the semaphore -- prove it by acquiring it with a timeout.
     await asyncio.wait_for(controller._admission.acquire(), timeout=1)
 
 
 async def test_rejects_with_503_when_at_capacity(logger) -> None:
     controller = StreamAgentController(
-        ScriptedUseCase([]), FakeSSEQueue, logger, max_concurrent_streams=1
+        ScriptedUseCase([]), QueueTurnEventStream, logger, max_concurrent_streams=1
     )
     await controller._admission.acquire()
 
@@ -109,7 +108,7 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
     cancelled = asyncio.Event()
 
     class HangingUseCase:
-        async def execute(self, request, events) -> None:
+        async def handle(self, request, events) -> None:
             started.set()
             try:
                 await asyncio.sleep(10)
@@ -121,14 +120,13 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
         async def is_disconnected(self) -> bool:
             return True
 
-    controller = StreamAgentController(HangingUseCase(), FakeSSEQueue, logger)
+    controller = StreamAgentController(HangingUseCase(), QueueTurnEventStream, logger)
 
-    events = FakeSSEQueue()
+    events = QueueTurnEventStream()
     generator = controller._event_generator(
-        request_id="r1",
         request=REQUEST,
         events=events,
-        use_case_task=asyncio.create_task(HangingUseCase().execute(REQUEST, events)),
+        use_case_task=asyncio.create_task(HangingUseCase().handle(REQUEST, events)),
         starlette_request=cast(Request, DisconnectedRequest()),
     )
 
@@ -140,24 +138,19 @@ async def test_client_disconnect_stops_the_stream_and_cancels_the_use_case(logge
 
 
 async def test_an_unexpected_error_yields_an_error_frame_then_reraises(logger) -> None:
-    class RaisingQueue:
-        async def get(self):
-            raise RuntimeError("queue broke")
-
     class BrokenEvents:
-        queue: Any = RaisingQueue()
-
-        async def token(self, value: str) -> None: ...
-        async def final(self, value: str, metadata: dict | None = None) -> None: ...
-        async def error(self, value: str) -> None: ...
+        async def publish(self, event: TurnEvent) -> None: ...
         async def complete(self) -> None: ...
 
-    controller = StreamAgentController(ScriptedUseCase([]), FakeSSEQueue, logger)
+        async def __aiter__(self) -> AsyncIterator[TurnEvent]:
+            raise RuntimeError("queue broke")
+            yield  # pragma: no cover
+
+    controller = StreamAgentController(ScriptedUseCase([]), QueueTurnEventStream, logger)
     done_task = asyncio.create_task(asyncio.sleep(0))
     await done_task
 
     generator = controller._event_generator(
-        request_id="r1",
         request=REQUEST,
         events=BrokenEvents(),
         use_case_task=done_task,
@@ -170,7 +163,8 @@ async def test_an_unexpected_error_yields_an_error_frame_then_reraises(logger) -
             chunks.append(chunk.decode("utf-8"))
 
     assert len(chunks) == 1
-    assert "event: final" in chunks[0]
+    assert "event: error" in chunks[0]
     payload = json.loads(chunks[0].split("\n")[1].removeprefix("data: "))
-    assert "queue broke" in payload["error"]
+    assert payload["type"] == "error"
+    assert "queue broke" in payload["content"]
     assert logger.messages("error")

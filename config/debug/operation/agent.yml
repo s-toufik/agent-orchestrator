@@ -1,0 +1,68 @@
+operation:
+  agent_context:
+    name: agent_context
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3.5-lightning-30b-a3b
+      temperature: 0.0
+      max_output_tokens: 1024
+      max_context_tokens: 32768
+      reasoning_effort: null
+
+  agent_plan:
+    name: agent_plan
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3-super-120b-a12b
+      temperature: 0.0
+      max_output_tokens: 8192
+      max_context_tokens: 32768
+      reasoning_effort: null
+
+  agent_act:
+    name: agent_act
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: null
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      max_iterations: 20
+      max_reflection_retries: 2
+      use_streaming: true
+      reasoning_effort: null
+
+  agent_reflection:
+    name: agent_reflection
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: null
+      temperature: 0.0
+      max_output_tokens: 4096
+      max_context_tokens: 16384
+      reasoning_effort: null
+
+  agent_summary:
+    name: agent_summary
+    connector: ${connector.llm_provider}
+    type: api
+    endpoint: /chat/completions
+    method: POST
+    parameters:
+      model: nvidia/nemotron-3.5-lightning-30b-a3b
+      temperature: 0.0
+      max_output_tokens: 1024
+      max_context_tokens: 32768
+      reasoning_effort: null

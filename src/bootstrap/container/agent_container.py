@@ -1,21 +1,19 @@
-from collections.abc import Callable
 from functools import cached_property
 
 from fastapi import APIRouter
 from pycraftcore.application_configuration import ApplicationConfiguration
 from pycraftcore.logger.port import Logger
 
+from agent_orchestrator.adapter.inbound.web.controller.list_models_controller import (
+    ListModelsController,
+)
 from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
     StreamAgentController,
 )
-from agent_orchestrator.adapter.outbound.langgraph.lang_agent import LangAgent
-from agent_orchestrator.adapter.outbound.streaming.sse_queue import SSEQueue
-from agent_orchestrator.application.port.inbound.stream_agent_port import StreamAgentPort
-from agent_orchestrator.application.port.outbound.agent_port import AgentPort
-from agent_orchestrator.application.port.outbound.sse_queue_port import SSEQueuePort
-from agent_orchestrator.application.use_case.stream_agent_usecase import StreamAgentUseCase
+from agent_orchestrator.adapter.outbound.event.queue_turn_event_stream import QueueTurnEventStream
 from bootstrap.di.agent_di import AgentDI
 from bootstrap.router.actuator.actuator_router import ActuatorRouter
+from bootstrap.router.agent.list_models_router import ListModelsRouter
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
 from src import (
     APPLICATION_AUTHORS_EMAIL,
@@ -57,15 +55,21 @@ class AgentContainer(AgentDI):
 
     async def _create_routers(self):
         self._routers.append(await self._stream_agent_router())
+        self._routers.append(self._list_models_router())
         self._routers.append(self._actuator_router())
 
     async def _stream_agent_router(self) -> APIRouter:
-        graphs, _ = await self._build_graphs()
-        agent: AgentPort = LangAgent(graphs)
-        use_case: StreamAgentPort = StreamAgentUseCase(agent, self._logging)
-        sse_queue: Callable[[], SSEQueuePort] = SSEQueue
-        controller = StreamAgentController(use_case, sse_queue, self._logging)
+        controller = StreamAgentController(
+            await self._handle_message(),
+            QueueTurnEventStream,
+            self._logging,
+            max_concurrent_streams=self._settings.max_concurrent_streams,
+        )
         return StreamAgentRouter(controller).router
+
+    def _list_models_router(self) -> APIRouter:
+        controller = ListModelsController(self._list_models(), self._logging)
+        return ListModelsRouter(controller).router
 
     @staticmethod
     def _actuator_router() -> APIRouter:

@@ -1,27 +1,3 @@
-"""Fixtures for live agent-quality evaluation with DeepEval.
-
-These tests drive the real LangGraph agent against a real toolbox -- real
-tools, real sqlite -- and use the project's own local LLM (served via LM
-Studio, see `connector.llm.base_url` in config) both as the agent-under-test
-and as the DeepEval judge model. No external LLM provider (OpenAI,
-Anthropic, ...) is ever called.
-
-The agent and its toolbox are independently deployed services now, so
-unlike the rest of this test suite these tests can't boot the toolbox
-in-process: a real `agent_toolbox` (see the sibling repo) must already be
-running and reachable at `TOOLBOX_URL` before this suite starts, exactly as
-in normal operation.
-
-They require a running local LLM server plus a running toolbox, and are
-excluded from the default `pytest` run (see the `evaluation` marker and
-`addopts` in pyproject.toml). Run them explicitly with:
-
-    # in the agent_toolbox repo
-    make run
-    # in this repo
-    pytest -m evaluation tests/evaluation
-"""
-
 import os
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -29,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from agent_orchestrator.adapter.outbound.langgraph.lang_agent import LangAgent
-from agent_orchestrator.adapter.outbound.langgraph.schema.agent_state import AgentState
-from agent_orchestrator.adapter.outbound.langgraph.service.state_serialization import unpack_state
-from agent_orchestrator.domain.model.agent_message import AgentMessage
-from agent_orchestrator.domain.model.agent_request import AgentRequest
+from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import TurnStateCodec
+from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
+from agent_orchestrator.domain.turn.answer import Answer
+from agent_orchestrator.domain.turn.outcome import Outcome
+from agent_orchestrator.domain.turn.turn import Turn
 from bootstrap.configuration.settings import ProcessSettings
 from bootstrap.di.agent_di import AgentDI
 from tests.evaluation.local_judge_model import LocalJudgeModel
@@ -41,9 +17,9 @@ from tests.evaluation.local_judge_model import LocalJudgeModel
 pytestmark = pytest.mark.evaluation
 
 REAL_CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
-EVAL_MODEL: str = os.getenv("EVAL_MODEL", "gpt_oss_20b")
+EVAL_MODEL: str = os.getenv("EVAL_MODEL", "qwen3-14b")
 
-RunAgent = Callable[[str], Awaitable[tuple[AgentMessage, AgentState]]]
+RunAgent = Callable[[str], Awaitable[tuple[Answer, Turn]]]
 
 
 def _settings(role: str) -> ProcessSettings:
@@ -78,25 +54,29 @@ async def agent_di(_base_env) -> AsyncIterator[AgentDI]:
 
 @pytest.fixture
 def judge_model(agent_di: AgentDI) -> LocalJudgeModel:
-    """The project's own local LLM, wrapped so DeepEval scores with it instead of OpenAI."""
-    return LocalJudgeModel(agent_di._llm_for_model(EVAL_MODEL, use_streaming=False))
+    return LocalJudgeModel(agent_di._chat_models.for_role(AgentRole.ACT, EVAL_MODEL))
 
 
 @pytest.fixture
 async def run_agent(agent_di: AgentDI) -> RunAgent:
-    """Runs one real turn through the real agent graph and returns
-    (the reply, the full final state -- conversation, tool calls, tool outputs)."""
-    checkpointer = await agent_di._checkpointer()
-    tool_registry = await agent_di._tool_registry()
-    graph = agent_di._build_graph(EVAL_MODEL, checkpointer, tool_registry)
-    agent = LangAgent({EVAL_MODEL: graph})
+    runner = await agent_di._workflow_runner(
+        await agent_di._toolbox(), await agent_di._checkpointer()
+    )
+    settings = agent_di._model_catalog.turn_settings(EVAL_MODEL)
+    codec = TurnStateCodec()
 
-    async def _run(question: str) -> tuple[AgentMessage, AgentState]:
-        request_id = str(uuid.uuid4())
-        message = await agent.run(
-            AgentRequest(message=question, model_name=EVAL_MODEL, request_id=request_id)
-        )
-        snapshot = await graph.aget_state({"configurable": {"thread_id": request_id}})
-        return message, unpack_state(snapshot.values)
+    async def _turn(message: str, conversation_id: str) -> Turn:
+        async for _ in runner.run(conversation_id, Turn(message, EVAL_MODEL, settings)):
+            pass
+        snapshot = await runner.graph.aget_state({"configurable": {"thread_id": conversation_id}})
+        return codec.decode_turn(snapshot.values)
+
+    async def _run(question: str) -> tuple[Answer, Turn]:
+        conversation_id = str(uuid.uuid4())
+        turn = await _turn(question, conversation_id)
+        if turn.answer is not None and turn.answer.outcome is Outcome.AWAITING_APPROVAL:
+            turn = await _turn("yes", conversation_id)
+        assert turn.answer is not None
+        return turn.answer, turn
 
     return _run

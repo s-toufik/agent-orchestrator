@@ -5,8 +5,9 @@ from functools import cached_property
 from pycraftcore.application_configuration import ApplicationConfiguration
 from pycraftcore.application_configuration.model.connector import TelemetryConnector
 from pycraftcore.http.port import AsyncHttpFactory
-from pycraftcore.logger.adapter import LoguruLogger
-from pycraftcore.logger.port import Logger, LogSink
+from pycraftcore.logger import configure_logging
+from pycraftcore.logger.adapter import StandardLogger
+from pycraftcore.logger.port import Logger
 from pycraftcore.repository.port import AsyncRepositoryFactory
 from pycraftcore.telemetry.adapter import OpenTelemetryProvider
 from pycraftcore.telemetry.port import TelemetryProvider
@@ -21,10 +22,12 @@ class BaseDI:
         self._settings = settings
         self._clients: list[AsyncHttpFactory] = []
         self._repositories: list[AsyncRepositoryFactory] = []
+        self._telemetry_log_handler: logging.Handler | None = None
 
     @cached_property
     def _logging(self) -> Logger:
-        return create_logger(LoguruLogger())
+        configure_logging(self._settings.log_level)
+        return create_logger(StandardLogger())
 
     @cached_property
     def _configuration(self) -> ApplicationConfiguration:
@@ -36,15 +39,12 @@ class BaseDI:
         provider = OpenTelemetryProvider(
             service_name=f"{self._settings.role}-service",
             environment=self._configuration.env,
-            otlp_endpoint=f"{connector.host}:{connector.port}",
+            otlp_endpoint=f"{connector.host}:{connector.port}"
+            if all([connector.host, connector.port])
+            else None,
         )
-        log_handler = provider.log_handler()
-        if isinstance(self._logging, LogSink):
-            self._logging.attach(log_handler)
-        # loguru is a separate system from stdlib logging: attaching only to it
-        # misses everything third-party libraries (mcp, uvicorn, starlette, ...)
-        # log via logging.getLogger(__name__). Attach at the root so it's caught too.
-        logging.getLogger().addHandler(log_handler)
+        self._telemetry_log_handler = provider.log_handler()
+        logging.getLogger().addHandler(self._telemetry_log_handler)
         return provider
 
     def _register_client(self, client: AsyncHttpFactory) -> AsyncHttpFactory:
@@ -74,5 +74,6 @@ class BaseDI:
     async def _shutdown_telemetry(self) -> None:
         provider = self.__dict__.pop("_telemetry_provider", None)
         if provider is not None:
-            # TracerProvider.shutdown() flushes buffered spans and can block on I/O.
+            if self._telemetry_log_handler is not None:
+                logging.getLogger().removeHandler(self._telemetry_log_handler)
             await asyncio.to_thread(provider.shutdown)

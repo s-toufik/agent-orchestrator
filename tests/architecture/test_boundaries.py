@@ -1,45 +1,80 @@
-"""Keeps the agent's hexagon honest now that it's a standalone service.
-
-`agent` talks to its toolbox only over MCP, as an external, independently
-deployed service -- it must never reach into a toolbox package directly,
-and its domain layer must stay framework-free.
-"""
-
 import ast
 from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parents[2] / "src"
+PACKAGE = SOURCE / "agent_orchestrator"
+
+FRAMEWORKS = {
+    "fastapi",
+    "starlette",
+    "mcp",
+    "langchain",
+    "langchain_core",
+    "langchain_openai",
+    "langgraph",
+    "pymongo",
+    "pydantic",
+    "httpx",
+    "httpx2",
+}
 
 
-def _imported_roots(package: str) -> set[str]:
-    roots: set[str] = set()
-    for path in (SOURCE / package).rglob("*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
+def _imports(directory: Path) -> dict[Path, set[str]]:
+    found: dict[Path, set[str]] = {}
+    for path in directory.rglob("*.py"):
+        modules: set[str] = set()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path))):
             if isinstance(node, ast.Import):
-                roots.update(alias.name.split(".", 1)[0] for alias in node.names)
+                modules.update(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-                roots.add(node.module.split(".", 1)[0])
-    return roots
+                modules.add(node.module)
+        found[path] = modules
+    return found
 
 
-def test_agent_does_not_import_a_toolbox_package_directly() -> None:
-    roots = _imported_roots("agent")
-    assert not roots & {"toolbox", "agent_toolbox"}
+def _violations(directory: Path, forbidden: set[str]) -> list[str]:
+    assert directory.is_dir(), f"{directory} does not exist"
+    return [
+        f"{path.relative_to(SOURCE)} imports {module}"
+        for path, modules in _imports(directory).items()
+        for module in modules
+        if any(module == prefix or module.startswith(f"{prefix}.") for prefix in forbidden)
+    ]
 
 
-def test_agent_does_not_import_bootstrap() -> None:
-    assert "bootstrap" not in _imported_roots("agent")
+def test_the_domain_is_free_of_frameworks_and_outer_layers() -> None:
+    forbidden = FRAMEWORKS | {
+        "agent_orchestrator.application",
+        "agent_orchestrator.adapter",
+        "bootstrap",
+    }
+    assert _violations(PACKAGE / "domain", forbidden) == []
 
 
-def test_domain_layer_stays_free_of_frameworks() -> None:
-    forbidden = {"fastapi", "starlette", "mcp", "langchain", "langgraph", "pydantic"}
-    for path in (SOURCE / "agent" / "domain").rglob("*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            module = None
-            if isinstance(node, ast.Import):
-                module = node.names[0].name.split(".", 1)[0]
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                module = node.module.split(".", 1)[0]
-            assert module not in forbidden, f"{path} imports {module}"
+def test_the_application_depends_only_on_the_domain() -> None:
+    forbidden = FRAMEWORKS | {"agent_orchestrator.adapter", "bootstrap"}
+    assert _violations(PACKAGE / "application", forbidden) == []
+
+
+def test_the_hexagon_never_imports_the_composition_root() -> None:
+    assert _violations(PACKAGE, {"bootstrap"}) == []
+
+
+def test_outbound_adapters_never_import_inbound_adapters() -> None:
+    forbidden = {"agent_orchestrator.adapter.inbound"}
+    assert _violations(PACKAGE / "adapter" / "outbound", forbidden) == []
+
+
+def test_the_agent_never_imports_a_toolbox_package_directly() -> None:
+    assert _violations(PACKAGE, {"toolbox", "agent_toolbox"}) == []
+
+
+def test_langgraph_nodes_only_delegate_to_the_application() -> None:
+    forbidden = {
+        "agent_orchestrator.adapter.outbound.llm",
+        "agent_orchestrator.adapter.outbound.tool",
+        "langchain",
+        "langchain_core",
+        "langchain_openai",
+    }
+    assert _violations(PACKAGE / "adapter" / "outbound" / "langgraph", forbidden) == []
