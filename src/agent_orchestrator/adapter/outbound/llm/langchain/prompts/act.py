@@ -18,9 +18,23 @@ Your tools (run only as part of a plan the user approved):
 
 Answer in well-structured Markdown
 
-Add a simple ASCII diagram only if it helps (plain characters, in a ``` block).
+{diagrams}
 
 Current UTC time: {now}"""
+
+_DIAGRAMS = """\
+When a flow, an architecture or how parts connect is easier to see than to read, add a
+plain-text diagram in a ```text block (never Mermaid). Skip it for simple answers.
+- Draw with box-drawing lines (─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼) and the arrows ► ◄ ▲ ▼.
+  Never use ▶ or ◀: they render as emoji and break the alignment.
+- Put branches of the same node in the same column, label arrows when the link needs a
+  name, and keep lines under 80 characters.
+Example:
+```text
+              ┌─ SQL ──────► PostgreSQL
+  Your app ───┼─ events ───► Kafka
+              └─ OTLP ─────► OTel Collector ──► Grafana
+```"""
 
 _EXECUTE = """\
 The user approved this plan. Carry it out step by step with your tools, then answer.
@@ -61,7 +75,9 @@ Write the corrected answer. Fix only what the critique flags."""
 
 def act_system_prompt(request: str, plan_steps: str | None, tools: list[ToolSpecification]) -> str:
     mode: str = _EXECUTE.format(steps=plan_steps) if plan_steps else _DIRECT
-    return _SYSTEM.format(request=request, tools=tool_catalog(tools), mode=mode, now=utc_now())
+    return _SYSTEM.format(
+        request=request, tools=tool_catalog(tools), mode=mode, diagrams=_DIAGRAMS, now=utc_now()
+    )
 
 
 def act_feedback(critique: str) -> str:

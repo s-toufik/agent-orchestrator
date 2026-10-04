@@ -71,3 +71,11 @@ def test_a_plan_request_is_read_from_any_line_of_the_reply() -> None:
     assert plan_request("NEEDS_PLAN: read it") == "read it"
     assert plan_request("I need the file.\n  NEEDS_PLAN: read it  ") == "read it"
     assert plan_request("Here is the answer.") is None
+
+
+def test_the_act_prompt_asks_for_aligned_text_diagrams_not_mermaid() -> None:
+    prompt = act_system_prompt("explain the stack", None, [])
+
+    assert "```text" in prompt
+    assert "never Mermaid" in prompt
+    assert "►" in prompt and "Never use ▶ or ◀" in prompt
