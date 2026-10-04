@@ -6,8 +6,8 @@ The recent conversation is the ground truth: if the interpretation contradicts i
 the answer against what the user meant in the conversation.
 
 - Accept if the answer gives the user what they asked for and its logic holds.
-- Retry if it misses what the user asked for, contradicts the tool evidence, or states
-  data (numbers, records, file contents) that is not in the tool evidence.
+- Retry if it misses what the user asked for.
+{grounding}
 - Do not reject for style or wording.
 - Keep the critique short and concrete: what to fix.
 
@@ -34,8 +34,19 @@ Answer to check:
 {answer}"""
 
 
-def reflection_system_prompt(output_format: object) -> str:
-    return _SYSTEM.format(output_format=output_format)
+_WITH_EVIDENCE = """\
+- Retry if it contradicts the tool evidence, or states data (numbers, records, file
+  contents) that is not in the tool evidence."""
+
+_WITHOUT_EVIDENCE = """\
+- No tool ran: the answer may use general knowledge and the conversation. Retry only if
+  it is wrong, or states the user's own data (numbers, records, file contents) that the
+  conversation does not give."""
+
+
+def reflection_system_prompt(output_format: object, has_evidence: bool) -> str:
+    grounding = _WITH_EVIDENCE if has_evidence else _WITHOUT_EVIDENCE
+    return _SYSTEM.format(output_format=output_format, grounding=grounding)
 
 
 def reflection_request(

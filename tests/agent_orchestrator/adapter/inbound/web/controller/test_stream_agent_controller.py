@@ -32,7 +32,7 @@ class ScriptedUseCase:
 
 
 def _finished(text: str) -> TurnEvent:
-    turn = Turn(request="hi", model="m", settings=TurnSettings(max_steps=6, stream_answer=True))
+    turn = Turn(request="hi", model="m", settings=TurnSettings(max_steps=6))
     turn.finish(Answer.answered(text))
     return TurnEvent.finished(turn)
 
@@ -43,14 +43,18 @@ async def _drain(response) -> list[str]:
 
 async def test_a_turn_streams_its_status_then_the_answer_then_complete(logger) -> None:
     turn = Turn(request="hi", model="m")
-    events = [TurnEvent.entering(Step.UNDERSTAND, turn), _finished("Hello")]
+    events = [
+        TurnEvent.entering(Step.UNDERSTAND, turn),
+        TurnEvent.answer_delta("Hel"),
+        _finished("Hello"),
+    ]
     controller = StreamAgentController(ScriptedUseCase(events), QueueTurnEventStream, logger)
 
     response = await controller.execute(REQUEST)
     chunks = await _drain(response)
 
     assert "event: status" in chunks[0] and "Understanding your request" in chunks[0]
-    assert "event: token" in chunks[1]
+    assert "event: token" in chunks[1] and "Hel" in chunks[1]
     assert "event: final" in chunks[2]
     final_payload = json.loads(chunks[2].split("\n")[1].removeprefix("data: "))
     assert final_payload["content"] == "Hello"

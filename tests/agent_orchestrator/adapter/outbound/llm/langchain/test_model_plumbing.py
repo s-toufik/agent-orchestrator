@@ -32,7 +32,6 @@ def _parameters(name: str, **fields) -> ModelParameters:
         "max_output_tokens": 100,
         "max_context_tokens": 1_000,
         "max_iterations": 4,
-        "use_streaming": False,
     }
     return ModelParameters(model_name=name, **{**defaults, **fields})
 
@@ -40,7 +39,7 @@ def _parameters(name: str, **fields) -> ModelParameters:
 CATALOG = ModelCatalog(
     models={
         "small": (CONNECTOR, _parameters("small", max_context_tokens=500)),
-        "big": (CONNECTOR, _parameters("big", max_iterations=9, use_streaming=True)),
+        "big": (CONNECTOR, _parameters("big", max_iterations=9)),
     },
     roles={AgentRole.CONTEXT: (CONNECTOR, _parameters("small"))},
 )
@@ -53,7 +52,7 @@ def test_a_role_without_a_model_follows_the_selection_and_a_frozen_one_does_not(
 
 def test_the_turn_budget_comes_from_the_model_that_acts() -> None:
     assert CATALOG.turn_settings("big") == TurnSettings(
-        max_steps=9, max_retries=2, context_tokens=1_000, stream_answer=True
+        max_steps=9, max_retries=2, context_tokens=1_000
     )
 
 
@@ -72,14 +71,13 @@ def test_an_unknown_model_is_refused() -> None:
         CATALOG.settings_for(AgentRole.ACT, "gpt-oss-20b")
 
 
-def test_chat_clients_are_built_once_per_model_and_never_stream() -> None:
+def test_chat_clients_are_built_once_per_model() -> None:
     models = ChatModels(CATALOG)
 
     act = models.for_role(AgentRole.ACT, "big")
 
     assert models.for_role(AgentRole.ACT, "big") is act
     assert models.for_role(AgentRole.CONTEXT, "big").model_name == "small"  # ty: ignore[unresolved-attribute]
-    assert act.streaming is False  # ty: ignore[unresolved-attribute]
 
 
 class _Unavailable(ModelError):

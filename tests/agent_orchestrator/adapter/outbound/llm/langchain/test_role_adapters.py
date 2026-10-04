@@ -9,7 +9,11 @@ from agent_orchestrator.adapter.outbound.llm.langchain.dto import UnderstandingD
 from agent_orchestrator.adapter.outbound.llm.langchain.intent_classifier import (
     LangChainIntentClassifier,
 )
+from agent_orchestrator.adapter.outbound.llm.langchain.plan_request import REQUEST_PLAN_TOOL
 from agent_orchestrator.adapter.outbound.llm.langchain.planner import LangChainPlanner
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.reply_reader import ReplyReader
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.streamed_reply import StreamedReply
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.whole_reply import WholeReply
 from agent_orchestrator.adapter.outbound.llm.langchain.reviewer import LangChainReviewer
 from agent_orchestrator.adapter.outbound.llm.langchain.summarizer import LangChainSummarizer
 from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
@@ -26,6 +30,7 @@ from tests.agent_orchestrator.adapter.outbound.llm.langchain.fakes import (
     text,
     tool_request,
 )
+from tests.agent_orchestrator.application.fakes import RecordingEvents
 from tests.agent_orchestrator.domain.builders import PLAN, answer, calling, result, turn
 
 ECHO = ToolSpecification("echo", "Echoes.", {"type": "object"})
@@ -35,6 +40,12 @@ WINDOW = ContextWindow()
 def _models(llm: FakeLLM) -> tuple[FakeChatModels, ChatModels]:
     fake = FakeChatModels(llm)
     return fake, cast(ChatModels, fake)
+
+
+def _actor(llm: FakeLLM, logger, final_reply: ReplyReader | None = None) -> LangChainActor:
+    return LangChainActor(
+        _models(llm)[1], WINDOW, logger, WholeReply(), final_reply or WholeReply()
+    )
 
 
 def _talked() -> Conversation:
@@ -91,15 +102,15 @@ async def test_the_planner_revises_the_pending_plan_and_ends_on_the_request(logg
     assert llm.calls[0][-1] == HumanMessage(content="msg")
 
 
-async def test_outside_a_plan_the_actor_lists_its_tools_but_binds_none(logger) -> None:
+async def test_outside_a_plan_the_actor_lists_its_tools_but_binds_only_the_plan_request(
+    logger,
+) -> None:
     llm = FakeLLM(replies=[text("hello")])
 
-    draft = await LangChainActor(_models(llm)[1], WINDOW, logger).act(
-        Conversation("c1"), turn(Intent.DIRECT), [ECHO]
-    )
+    draft = await _actor(llm, logger).act(Conversation("c1"), turn(Intent.DIRECT), [ECHO])
 
     assert (draft.text, draft.tool_calls) == ("hello", ())
-    assert llm.tool_bindings == []
+    assert llm.tool_bindings == [[REQUEST_PLAN_TOOL]]
     assert "- echo: Echoes." in llm.prompt()
     assert "cannot run tools" in llm.prompt()
 
@@ -112,9 +123,7 @@ async def test_under_a_plan_the_actor_binds_tools_and_replays_the_work(logger) -
     current.drafted(answer("draft"))
     current.give_feedback("shorter")
 
-    draft = await LangChainActor(_models(llm)[1], WINDOW, logger).act(
-        Conversation("c1"), current, [ECHO]
-    )
+    draft = await _actor(llm, logger).act(Conversation("c1"), current, [ECHO])
 
     assert llm.tool_bindings == [
         [{"name": "echo", "description": "Echoes.", "parameters": {"type": "object"}}]
@@ -150,6 +159,17 @@ async def test_the_reviewer_judges_the_draft_against_the_evidence_and_the_exchan
     assert "- the count" in prompt and PLAN.steps in prompt
     assert "x" * 2_000 + " [...]" in prompt
     assert "42 rows" in prompt
+    assert "not in the tool evidence" in prompt
+
+
+async def test_without_evidence_the_reviewer_accepts_general_knowledge(logger) -> None:
+    llm = FakeLLM(parsed=[VerdictDto(action=VerdictAction.ACCEPT, critique="")])
+    current = turn(Intent.CONTINUATION)
+    current.drafted(answer("A KV cache stores keys and values."))
+
+    await LangChainReviewer(_models(llm)[1], logger).review(_talked(), current)
+
+    assert "may use general knowledge" in llm.prompt()
 
 
 async def test_the_summarizer_merges_the_summary_with_the_older_messages(logger) -> None:
@@ -165,23 +185,40 @@ async def test_the_summarizer_merges_the_summary_with_the_older_messages(logger)
     assert "before" in llm.prompt() and "Assistant: A quantile." in llm.prompt()
 
 
-async def test_outside_a_plan_a_reply_asking_for_one_becomes_a_plan_request(logger) -> None:
-    llm = FakeLLM(replies=[text("I need to read it.\nNEEDS_PLAN: read change.md")])
+async def test_outside_a_plan_a_plan_request_call_becomes_a_plan_request(logger) -> None:
+    llm = FakeLLM(replies=[tool_request("request_plan", reason="read change.md")])
 
-    draft = await LangChainActor(_models(llm)[1], WINDOW, logger).act(
-        Conversation("c1"), turn(Intent.DIRECT), [ECHO]
-    )
+    draft = await _actor(llm, logger).act(Conversation("c1"), turn(Intent.DIRECT), [ECHO])
 
     assert draft == Draft.asking_for_plan("read change.md")
-    assert "NEEDS_PLAN:" in llm.prompt()
 
 
-async def test_under_a_plan_the_reply_is_never_read_as_a_plan_request(logger) -> None:
-    llm = FakeLLM(replies=[text("NEEDS_PLAN: more")])
+async def test_under_a_plan_the_plan_request_tool_is_not_offered(logger) -> None:
+    llm = FakeLLM(replies=[text("done")])
 
-    draft = await LangChainActor(_models(llm)[1], WINDOW, logger).act(
+    draft = await _actor(llm, logger).act(
         Conversation("c1"), turn(Intent.PLAN_APPROVAL, plan=PLAN), [ECHO]
     )
 
-    assert not draft.asks_for_plan
-    assert "NEEDS_PLAN:" not in str(llm.calls[0][0].content)
+    assert draft == Draft("done")
+    assert REQUEST_PLAN_TOOL not in llm.tool_bindings[0]
+
+
+async def test_a_plain_direct_answer_is_read_by_the_final_reply(logger) -> None:
+    llm, events = FakeLLM(replies=[text("hello there")]), RecordingEvents()
+    actor = _actor(llm, logger, StreamedReply(events))
+
+    draft = await actor.act(Conversation("c1"), turn(Intent.DIRECT), [ECHO])
+
+    assert draft == Draft("hello there")
+    assert [event.text for event in events.published] == ["hello ", "there"]
+
+
+async def test_a_reply_that_will_be_reviewed_is_never_read_by_the_final_reply(logger) -> None:
+    llm, events = FakeLLM(replies=[text("hello")]), RecordingEvents()
+    actor = _actor(llm, logger, StreamedReply(events))
+
+    draft = await actor.act(Conversation("c1"), turn(Intent.CONTINUATION), [ECHO])
+
+    assert draft == Draft("hello")
+    assert events.published == []

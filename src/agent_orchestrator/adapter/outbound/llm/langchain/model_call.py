@@ -1,4 +1,5 @@
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from typing import Any
 
 from langchain_core.exceptions import ModelError
@@ -12,13 +13,19 @@ from agent_orchestrator.domain.exception.agent_unavailable_exception import (
 )
 
 
-async def invoke(model: Runnable, messages: Sequence[BaseMessage]) -> Any:
+@contextmanager
+def model_errors() -> Iterator[None]:
     try:
-        return await model.ainvoke(list(messages))
+        yield
     except ModelError as exception:
         if exception.is_retryable:
             raise AgentUnavailableException(str(exception)) from exception
         raise
+
+
+async def invoke(model: Runnable, messages: Sequence[BaseMessage]) -> Any:
+    with model_errors():
+        return await model.ainvoke(list(messages))
 
 
 async def invoke_structured[T: BaseModel](

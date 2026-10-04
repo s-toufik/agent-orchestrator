@@ -1,6 +1,9 @@
+import json
+import re
+from collections.abc import AsyncIterator
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 
 from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 
@@ -26,6 +29,23 @@ class FakeLLM:
         if isinstance(reply, Exception):
             raise reply
         return reply
+
+    async def astream(self, messages: list[BaseMessage]) -> AsyncIterator[AIMessageChunk]:
+        reply = await self.ainvoke(messages)
+        for piece in re.findall(r"\S+\s*", reply.content):
+            yield AIMessageChunk(content=piece)
+        for index, call in enumerate(reply.tool_calls):
+            yield AIMessageChunk(
+                content="",
+                tool_call_chunks=[
+                    {
+                        "id": call["id"],
+                        "name": call["name"],
+                        "args": json.dumps(call["args"]),
+                        "index": index,
+                    }
+                ],
+            )
 
     def prompt(self, call: int = -1) -> str:
         return "\n".join(str(message.content) for message in self.calls[call])

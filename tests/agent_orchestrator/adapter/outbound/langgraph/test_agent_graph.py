@@ -14,6 +14,7 @@ from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import
 from agent_orchestrator.application.step.clarify_step import ClarifyStep
 from agent_orchestrator.application.step.finish_step import FinishStep
 from agent_orchestrator.domain.conversation.conversation import Conversation
+from agent_orchestrator.domain.event.turn_event import TurnEventKind
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
@@ -21,6 +22,7 @@ from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.workflow.step import Step
 from agent_orchestrator.domain.workflow.turn_policy import TurnPolicy
+from tests.agent_orchestrator.application.fakes import RecordingEvents
 
 CODEC = TurnStateCodec()
 POLICY = TurnPolicy()
@@ -46,21 +48,33 @@ def test_there_is_one_node_class_per_step() -> None:
 
 def test_a_node_refuses_the_handler_of_another_step() -> None:
     with pytest.raises(ValueError):
-        ActNode(ClarifyStep(), CODEC)
+        ActNode(ClarifyStep(), CODEC, RecordingEvents())
 
 
 async def test_a_node_delegates_to_its_handler_and_hands_back_the_state() -> None:
     handler = RecordingHandler(Step.ACT)
     state = CODEC.encode(Conversation("c1"), Turn("hi", "m"))
 
-    new_state = await ActNode(handler, CODEC)(state)
+    new_state = await ActNode(handler, CODEC, RecordingEvents())(state)
 
     assert len(handler.runs) == 1
     assert CODEC.decode_turn(new_state).last_draft == Draft("done")
 
 
+async def test_a_node_announces_its_step_before_running_it() -> None:
+    events = RecordingEvents()
+
+    await ActNode(RecordingHandler(Step.ACT), CODEC, events)(
+        CODEC.encode(Conversation("c1"), Turn("hi", "m"))
+    )
+
+    assert [(event.kind, event.step) for event in events.published] == [
+        (TurnEventKind.STEP_STARTED, Step.ACT)
+    ]
+
+
 def _edges() -> dict[str, set[str]]:
-    nodes = agent_nodes(_handlers(), CODEC)  # ty: ignore[invalid-argument-type]
+    nodes = agent_nodes(_handlers(), CODEC, RecordingEvents())  # ty: ignore[invalid-argument-type]
     graph = AgentGraphBuilder(nodes, POLICY, PolicyRouter(POLICY, CODEC)).build().get_graph()
     edges: dict[str, set[str]] = {}
     for edge in graph.edges:

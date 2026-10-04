@@ -19,6 +19,8 @@ class SsePresenter:
             case TurnEventKind.STEP_STARTED:
                 status = self._status(event)
                 return [_stream(MessageStreamType.STATUS, status)] if status else []
+            case TurnEventKind.ANSWER_DELTA:
+                return [_stream(MessageStreamType.TOKEN, event.text)]
             case TurnEventKind.FINISHED:
                 return self._finished(event, session_id)
             case TurnEventKind.FAILED:
@@ -41,17 +43,16 @@ class SsePresenter:
     @staticmethod
     def _finished(event: TurnEvent, session_id: str) -> list[bytes]:
         answer = event.answer
-        text = answer.text if answer else ""
         final = AgentMessageSchema(
             session_id=session_id,
-            content=text,
+            content=answer.text if answer else "",
             metadata={
                 "iteration": str(event.steps_taken),
                 "max_iteration": str(event.max_steps),
                 "outcome": str(answer.outcome) if answer else "",
             },
         ).serialize()
-        return [_stream(MessageStreamType.TOKEN, text), final] if event.stream_answer else [final]
+        return [final]
 
 
 def _stream(event_type: MessageStreamType, content: str) -> bytes:

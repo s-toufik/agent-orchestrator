@@ -24,7 +24,6 @@ class LLMChat:
             http_async_client=self._async_client,
             max_tokens=self._model_parameters.max_output_tokens,
             temperature=self._model_parameters.temperature,
-            streaming=self._model_parameters.use_streaming,
             reasoning_effort=self._model_parameters.reasoning_effort,
             extra_body=thinking_switch(self._model_parameters.reasoning_effort),
             max_retries=0,

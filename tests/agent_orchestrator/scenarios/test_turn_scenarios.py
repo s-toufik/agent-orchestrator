@@ -9,6 +9,9 @@ from agent_orchestrator.adapter.outbound.langgraph.graph.agent_graph_builder imp
     AgentGraphBuilder,
 )
 from agent_orchestrator.adapter.outbound.langgraph.graph.policy_router import PolicyRouter
+from agent_orchestrator.adapter.outbound.langgraph.langgraph_event_publisher import (
+    LangGraphEventPublisher,
+)
 from agent_orchestrator.adapter.outbound.langgraph.langgraph_workflow_runner import (
     LangGraphWorkflowRunner,
 )
@@ -123,7 +126,9 @@ RUNNERS = pytest.mark.parametrize("runner_kind", ["memory", "langgraph"])
 
 def _langgraph(steps: list[StepHandler], logger, checkpointer) -> LangGraphWorkflowRunner:
     codec, policy = TurnStateCodec(), TurnPolicy()
-    builder = AgentGraphBuilder(agent_nodes(steps, codec), policy, PolicyRouter(policy, codec))
+    builder = AgentGraphBuilder(
+        agent_nodes(steps, codec, LangGraphEventPublisher()), policy, PolicyRouter(policy, codec)
+    )
     return LangGraphWorkflowRunner(builder.build(checkpointer), logger)
 
 

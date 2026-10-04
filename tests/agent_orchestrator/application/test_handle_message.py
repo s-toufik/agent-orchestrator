@@ -1,4 +1,7 @@
+import asyncio
 from collections.abc import AsyncIterator
+
+import pytest
 
 from agent_orchestrator.application.port.inbound.agent_request import AgentRequest
 from agent_orchestrator.application.use_case.handle_message import (
@@ -81,3 +84,32 @@ async def test_the_auto_approve_choice_reaches_the_turn(logger) -> None:
     await HandleMessage(runner, FakeModels(), logger).handle(request, ListEventStream())
 
     assert runner.turns[0][1].options.auto_approve is True
+
+
+async def test_a_finished_turn_is_logged_with_its_outcome_and_duration(logger) -> None:
+    await HandleMessage(RecordingRunner(), FakeModels(), logger).handle(REQUEST, ListEventStream())
+
+    [finished] = logger.messages("info")
+    assert finished.startswith("turn finished: no answer, 0/")
+    assert finished.endswith("s")
+
+
+class _EndlessRunner:
+    async def run(self, conversation_id: str, turn: Turn) -> AsyncIterator[TurnEvent]:
+        await asyncio.Event().wait()
+        yield TurnEvent.finished(turn)
+
+
+async def test_a_cancelled_turn_is_logged_and_still_cancelled(logger) -> None:
+    events = ListEventStream()
+    task = asyncio.create_task(
+        HandleMessage(_EndlessRunner(), FakeModels(), logger).handle(REQUEST, events)
+    )
+    await asyncio.sleep(0)
+
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert logger.messages("warning")[0].startswith("turn cancelled after ")
+    assert events.completed

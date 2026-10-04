@@ -51,6 +51,14 @@ class FakeActor(Scripted):
         return self._next(conversation, turn)
 
 
+class RecordingEvents:
+    def __init__(self) -> None:
+        self.published: list[TurnEvent] = []
+
+    async def publish(self, event: TurnEvent) -> None:
+        self.published.append(event)
+
+
 class FakeReviewer(Scripted):
     async def review(self, conversation: Conversation, turn: Turn) -> Verdict | None:
         return self._next(conversation, turn)

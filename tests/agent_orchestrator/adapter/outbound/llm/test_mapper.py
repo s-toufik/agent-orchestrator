@@ -53,7 +53,6 @@ def test_defaults_every_parameter_when_absent() -> None:
     assert parameters.max_context_tokens == 8000
     assert parameters.temperature == 0.0
     assert parameters.max_iterations == 10
-    assert parameters.use_streaming is False
     assert parameters.reasoning_effort is None
 
 
@@ -65,7 +64,6 @@ def test_uses_explicit_parameters_when_present() -> None:
                 "max_context_tokens": 2_000,
                 "temperature": 0.7,
                 "max_iterations": 3,
-                "use_streaming": True,
                 "reasoning_effort": "medium",
             }
         )
@@ -75,7 +73,6 @@ def test_uses_explicit_parameters_when_present() -> None:
     assert parameters.max_context_tokens == 2_000
     assert parameters.temperature == 0.7
     assert parameters.max_iterations == 3
-    assert parameters.use_streaming is True
     assert parameters.reasoning_effort is ReasoningEffort.MEDIUM
 
 

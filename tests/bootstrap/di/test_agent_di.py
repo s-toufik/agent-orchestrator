@@ -14,6 +14,9 @@ from pycraftcore.application_configuration.model.connector import (
 from pycraftcore.application_configuration.model.operation import OperationRegistry
 from pycraftcore.authentication.model.no_auth import NoAuth
 
+from agent_orchestrator.adapter.outbound.llm.enum.answer_delivery import AnswerDelivery
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.streamed_reply import StreamedReply
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.whole_reply import WholeReply
 from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 from agent_orchestrator.adapter.outbound.tool.tool_registry import ToolRegistry
 from agent_orchestrator.adapter.outbound.tool.toolbox import Toolbox
@@ -38,11 +41,14 @@ def _base_env(monkeypatch, tmp_path):
     monkeypatch.setenv("LLM_API_KEY", "test")
 
 
-def make_settings(tmp_path: Path | None = None) -> ProcessSettings:
+def make_settings(
+    tmp_path: Path | None = None, answer_delivery: AnswerDelivery = AnswerDelivery.STREAM
+) -> ProcessSettings:
     return ProcessSettings(
         role="agent-orchestrator",
         environment="debug",
         configuration_directory=REAL_CONFIG_DIR,
+        answer_delivery=answer_delivery,
     )
 
 
@@ -225,3 +231,13 @@ async def test_the_workflow_graph_has_one_node_per_step() -> None:
     nodes = set(runner.graph.get_graph().nodes) - {"__start__", "__end__"}
 
     assert nodes == {step.value for step in Step if step is not Step.END}
+
+
+@pytest.mark.parametrize(
+    ("delivery", "reader"),
+    [(AnswerDelivery.STREAM, StreamedReply), (AnswerDelivery.WHOLE, WholeReply)],
+)
+def test_the_final_reply_follows_the_answer_delivery(delivery, reader) -> None:
+    di = AgentDI(make_settings(answer_delivery=delivery))
+
+    assert isinstance(di._final_reply(), reader)

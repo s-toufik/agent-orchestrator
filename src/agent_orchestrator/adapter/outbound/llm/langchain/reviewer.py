@@ -34,7 +34,11 @@ class LangChainReviewer:
         understanding = turn.understanding
         draft = turn.last_draft
         messages = [
-            SystemMessage(content=reflection_system_prompt(VerdictDto.model_json_schema())),
+            SystemMessage(
+                content=reflection_system_prompt(
+                    VerdictDto.model_json_schema(), has_evidence=bool(turn.evidence)
+                )
+            ),
             HumanMessage(
                 content=reflection_request(
                     conversation=self._recent(conversation, turn),

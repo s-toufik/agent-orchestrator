@@ -77,8 +77,8 @@ A server-sent event stream; each frame is `event: <type>` + `data: <json>`. New 
 | Event | What to do with it |
 |---|---|
 | `status` | Progress ("Understanding your request", "Preparing a plan", "Running file_reader", "Checking the answer"): show it as an indicator |
-| `token` | The answer, sent once just before `final` when the model is configured with `use_streaming` |
-| `final` | The answer: show it |
+| `token` | A piece of the answer as it is written, sent for answers that need no review when `AGENT_ANSWER_DELIVERY=stream`: append the pieces, then let `final` replace them |
+| `final` | The complete answer: show it (it replaces any `token` pieces) |
 | `error` | The request failed; the content says why |
 | `complete` | Always last |
 
@@ -138,6 +138,7 @@ A pending plan survives while you discuss it (a revision or an unclear message) 
 | `CONFIGURATION_DIR` | `./config` | Where `config/` is |
 | `DEPLOYMENT_ENVIRONMENT` | `unknown` | Label shown by `/actuator/info` and on telemetry |
 | `MAX_CONCURRENT_STREAMS` | `200` | Open streams accepted at once; above it the API answers `503` |
+| `AGENT_ANSWER_DELIVERY` | `stream` | `stream`: answers that need no review are sent piece by piece as `token` events, then `final`. `whole`: only `final` |
 | `LLM_BASE_URL`, `LLM_API_KEY` | required | The OpenAI-compatible model server, e.g. `http://<llm-server>:<port>/v1`, and its key (empty for a local server) |
 | `TOOLBOX_URL` | required | The MCP server, e.g. `http://<toolbox-host>:<port>/mcp` |
 | `DB_MONGO_CHECKPOINT_HOST` / `_PORT` / `_NAME` / `_USERNAME` / `_PASSWORD` | required | Conversation storage in MongoDB |
@@ -167,7 +168,6 @@ A pending plan survives while you discuss it (a revision or an unclear message) 
 | `max_context_tokens` | The model's context window | `8000` |
 | `max_iterations` | Step budget per message | `10` |
 | `max_reflection_retries` | How many times a rejected answer is rewritten | `2` |
-| `use_streaming` | Also send the answer as a `token` event before `final` | `false` |
 | `reasoning_effort` | `null`: no thinking. `low` / `medium` / `high`: think first (slower, needs a larger `max_output_tokens`) | `null` |
 
 To add a model: add its entry, list it under `operation:` in `config/root.yml`, and restart; it then appears in `GET /v1/models`. An entry's key cannot contain a dot: write `qwen3_5-2b` as the key and `model: qwen3.5-2b` in its parameters.
@@ -175,7 +175,7 @@ To add a model: add its entry, list it under `operation:` in `config/root.yml`, 
 **Model per step** (`operation/agent.yml`): every step that calls a model has an entry named after its role — today `agent_context` (understand), `agent_plan`, `agent_act` (answer and tools), `agent_reflection` (review) and `agent_summary`. A step added later that calls a model gets its own entry the same way.
 
 - `parameters.model: null` — the step uses the model named in the request.
-- `parameters.model: <name>` — the step always uses that model, with the parameters written in the same entry. When `agent_act` is fixed, its entry also sets the turn's budget (`max_iterations`, `max_reflection_retries`, `max_context_tokens`, `use_streaming`).
+- `parameters.model: <name>` — the step always uses that model, with the parameters written in the same entry. When `agent_act` is fixed, its entry also sets the turn's budget (`max_iterations`, `max_reflection_retries`, `max_context_tokens`).
 
 **More MCP servers:** add a connector whose name starts with `external_mcp_` in `connector/mcp.yml`, list it under `mcp:` in `config/root.yml`, and restart. Its tools join the same catalogue:
 
@@ -199,7 +199,10 @@ One format for every line; the third column is the request id (the conversation 
 
 ```text
 2026-09-27 10:47:47.785 | INFO     | my-conversation | stream_agent_controller:execute:45 - stream request accepted
+2026-09-27 10:47:52.310 | INFO     | my-conversation | handle_message:handle:42 - turn finished: answered, 1/20 steps in 4.5s
 ```
+
+Every turn ends with a `turn finished` line (outcome, steps used, duration) or a `turn cancelled after …` warning when the client left first.
 
 With `OTEL_HOST` set, the same lines also go to the OpenTelemetry collector, with `request_id` as an attribute.
 

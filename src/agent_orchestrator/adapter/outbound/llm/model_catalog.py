@@ -45,7 +45,6 @@ class ModelCatalog:
             max_steps=parameters.max_iterations,
             max_retries=parameters.max_reflection_retries,
             context_tokens=parameters.max_context_tokens,
-            stream_answer=parameters.use_streaming,
         )
 
     def listing(self) -> ModelListing:

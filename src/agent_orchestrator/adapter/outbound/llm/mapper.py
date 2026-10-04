@@ -30,7 +30,6 @@ class ModelSettingsMapper:
                 max_context_tokens=cast(int, parameters.get("max_context_tokens", 8000)),
                 temperature=cast(float, parameters.get("temperature", 0.0)),
                 max_iterations=cast(int, parameters.get("max_iterations", 10)),
-                use_streaming=cast(bool, parameters.get("use_streaming", False)),
                 max_reflection_retries=cast(int, parameters.get("max_reflection_retries", 2)),
                 reasoning_effort=_reasoning_effort(parameters.get("reasoning_effort")),
             ),

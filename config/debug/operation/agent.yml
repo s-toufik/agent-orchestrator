@@ -38,7 +38,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   agent_reflection:

@@ -10,6 +10,7 @@ from agent_orchestrator.domain.workflow.step import Step
 
 class TurnEventKind(StrEnum):
     STEP_STARTED = "step_started"
+    ANSWER_DELTA = "answer_delta"
     FINISHED = "finished"
     FAILED = "failed"
 
@@ -22,7 +23,7 @@ class TurnEvent:
     answer: Answer | None = None
     steps_taken: int = 0
     max_steps: int = 0
-    stream_answer: bool = False
+    text: str = ""
     error: str = ""
 
     @classmethod
@@ -40,8 +41,11 @@ class TurnEvent:
             answer=turn.answer,
             steps_taken=turn.steps_taken,
             max_steps=turn.settings.max_steps,
-            stream_answer=turn.settings.stream_answer,
         )
+
+    @classmethod
+    def answer_delta(cls, text: str) -> TurnEvent:
+        return cls(TurnEventKind.ANSWER_DELTA, text=text)
 
     @classmethod
     def failed(cls, error: str) -> TurnEvent:

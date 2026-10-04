@@ -15,8 +15,7 @@ class ChatModels:
         connector, parameters = self._catalog.settings_for(role, model)
         key = (connector.base_url, parameters.model_dump_json())
         if key not in self._clients:
-            unstreamed = parameters.model_copy(update={"use_streaming": False})
             self._clients[key] = LLMChat(
-                connector, unstreamed, self._http_client
+                connector, parameters, self._http_client
             ).create_chat_client()
         return self._clients[key]

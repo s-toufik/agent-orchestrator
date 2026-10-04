@@ -50,15 +50,15 @@ def test_other_steps_run_silently(step: Step) -> None:
     assert PRESENTER.present(TurnEvent.entering(step, Turn("hi", "m")), "c1") == []
 
 
-def _finished(stream: bool) -> TurnEvent:
-    turn = Turn("hi", "m", settings=TurnSettings(max_steps=6, stream_answer=stream))
+def _finished() -> TurnEvent:
+    turn = Turn("hi", "m", settings=TurnSettings(max_steps=6))
     turn.drafted(Draft("hello"))
     turn.finish(Answer.answered("hello"))
     return TurnEvent.finished(turn)
 
 
 def test_the_answer_is_sent_as_the_final_event_with_its_metadata() -> None:
-    frames = _frames(PRESENTER.present(_finished(stream=False), "c1"))
+    frames = _frames(PRESENTER.present(_finished(), "c1"))
 
     assert [name for name, _ in frames] == ["final"]
     final = frames[0][1]
@@ -66,11 +66,10 @@ def test_the_answer_is_sent_as_the_final_event_with_its_metadata() -> None:
     assert final["metadata"] == {"iteration": "1", "max_iteration": "6", "outcome": "answered"}
 
 
-def test_a_streamed_answer_is_also_sent_as_a_token_first() -> None:
-    frames = _frames(PRESENTER.present(_finished(stream=True), "c1"))
+def test_each_piece_of_a_streamed_answer_is_a_token_event() -> None:
+    frames = _frames(PRESENTER.present(TurnEvent.answer_delta("hel"), "c1"))
 
-    assert [name for name, _ in frames] == ["token", "final"]
-    assert frames[0][1]["content"] == "hello"
+    assert frames == [("token", {"type": "token", "content": "hel"})]
 
 
 def test_a_failure_is_an_error_event() -> None:

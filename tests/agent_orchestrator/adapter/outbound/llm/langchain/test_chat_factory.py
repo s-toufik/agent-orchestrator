@@ -13,7 +13,6 @@ def test_create_chat_client_applies_every_configured_field() -> None:
         max_output_tokens=1234,
         max_context_tokens=8000,
         max_iterations=6,
-        use_streaming=True,
         reasoning_effort=ReasoningEffort.MEDIUM,
     )
 
@@ -22,7 +21,6 @@ def test_create_chat_client_applies_every_configured_field() -> None:
     assert client.model_name == "qwen3-14b"
     assert client.temperature == 0.3
     assert client.max_tokens == 1234
-    assert client.streaming is True
     assert client.openai_api_base == "http://example.com"
     assert client.reasoning_effort == "medium"
     assert client.extra_body == {"chat_template_kwargs": {"enable_thinking": True}}
@@ -36,7 +34,6 @@ def test_the_langchain_openai_sdk_retries_are_disabled() -> None:
         max_output_tokens=100,
         max_context_tokens=100,
         max_iterations=1,
-        use_streaming=False,
     )
 
     client = LLMChat(connector, parameters).create_chat_client()

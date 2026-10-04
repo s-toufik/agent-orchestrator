@@ -2,7 +2,6 @@ from agent_orchestrator.adapter.outbound.llm.langchain.prompts import act, clock
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.act import (
     act_feedback,
     act_system_prompt,
-    plan_request,
 )
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.context import (
     context_request,
@@ -45,7 +44,7 @@ def test_prompts_carry_the_current_time(monkeypatch) -> None:
 
 def test_structured_prompts_embed_their_output_schema() -> None:
     assert "SCHEMA" in context_system_prompt("SCHEMA")
-    assert "SCHEMA" in reflection_system_prompt("SCHEMA")
+    assert "SCHEMA" in reflection_system_prompt("SCHEMA", has_evidence=True)
 
 
 def test_requests_fall_back_to_none_when_a_part_is_missing() -> None:
@@ -67,10 +66,25 @@ def test_the_context_prompt_checks_for_a_task_before_a_continuation_or_a_direct_
     assert "questions about the assistant itself" in prompt
 
 
-def test_a_plan_request_is_read_from_any_line_of_the_reply() -> None:
-    assert plan_request("NEEDS_PLAN: read it") == "read it"
-    assert plan_request("I need the file.\n  NEEDS_PLAN: read it  ") == "read it"
-    assert plan_request("Here is the answer.") is None
+def test_the_context_prompt_keeps_general_knowledge_questions_direct() -> None:
+    prompt = context_system_prompt("SCHEMA")
+
+    assert "the user's own data, files, records or systems" in prompt
+    assert "alternatives or good practices, even when\n   technical" in prompt
+    assert '"are there alternatives to Kafka?" -> direct' in prompt
+
+
+def test_the_review_holds_an_answer_to_the_tool_evidence_only_when_a_tool_ran() -> None:
+    grounded = reflection_system_prompt("SCHEMA", has_evidence=True)
+    ungrounded = reflection_system_prompt("SCHEMA", has_evidence=False)
+
+    assert "not in the tool evidence" in grounded and "general knowledge" not in grounded
+    assert "may use general knowledge" in ungrounded and "tool evidence" not in ungrounded
+
+
+def test_without_a_plan_the_act_prompt_asks_for_a_plan_through_its_tool() -> None:
+    assert "call request_plan instead of answering" in act_system_prompt("q", None, [])
+    assert "request_plan" not in act_system_prompt("q", "1. do", [])
 
 
 def test_the_act_prompt_asks_for_aligned_text_diagrams_not_mermaid() -> None:

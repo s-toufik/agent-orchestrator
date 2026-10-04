@@ -33,11 +33,15 @@ from agent_orchestrator.adapter.outbound.langgraph.graph.agent_graph_builder imp
     AgentGraphBuilder,
 )
 from agent_orchestrator.adapter.outbound.langgraph.graph.policy_router import PolicyRouter
+from agent_orchestrator.adapter.outbound.langgraph.langgraph_event_publisher import (
+    LangGraphEventPublisher,
+)
 from agent_orchestrator.adapter.outbound.langgraph.langgraph_workflow_runner import (
     LangGraphWorkflowRunner,
 )
 from agent_orchestrator.adapter.outbound.langgraph.node.agent_nodes import agent_nodes
 from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import TurnStateCodec
+from agent_orchestrator.adapter.outbound.llm.enum.answer_delivery import AnswerDelivery
 from agent_orchestrator.adapter.outbound.llm.langchain.actor import LangChainActor
 from agent_orchestrator.adapter.outbound.llm.langchain.chat_models import ChatModels
 from agent_orchestrator.adapter.outbound.llm.langchain.context_window import ContextWindow
@@ -45,6 +49,9 @@ from agent_orchestrator.adapter.outbound.llm.langchain.intent_classifier import 
     LangChainIntentClassifier,
 )
 from agent_orchestrator.adapter.outbound.llm.langchain.planner import LangChainPlanner
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.reply_reader import ReplyReader
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.streamed_reply import StreamedReply
+from agent_orchestrator.adapter.outbound.llm.langchain.reply.whole_reply import WholeReply
 from agent_orchestrator.adapter.outbound.llm.langchain.reviewer import LangChainReviewer
 from agent_orchestrator.adapter.outbound.llm.langchain.summarizer import LangChainSummarizer
 from agent_orchestrator.adapter.outbound.llm.langchain.token_counter import (
@@ -243,9 +250,20 @@ class AgentDI(BaseDI):
     ) -> LangGraphWorkflowRunner:
         return LangGraphWorkflowRunner(self._agent_graph(toolbox, checkpointer), self._logging)
 
+    @cached_property
+    def _turn_events(self) -> LangGraphEventPublisher:
+        return LangGraphEventPublisher()
+
+    def _final_reply(self) -> ReplyReader:
+        match self._settings.answer_delivery:
+            case AnswerDelivery.STREAM:
+                return StreamedReply(self._turn_events)
+            case AnswerDelivery.WHOLE:
+                return WholeReply()
+
     def _agent_graph(self, toolbox: Toolbox, checkpointer: Any) -> Any:
         codec, policy = TurnStateCodec(), TurnPolicy()
-        nodes = agent_nodes(self._steps(toolbox), codec)
+        nodes = agent_nodes(self._steps(toolbox), codec, self._turn_events)
         return AgentGraphBuilder(nodes, policy, PolicyRouter(policy, codec)).build(checkpointer)
 
     def _steps(self, toolbox: Toolbox) -> list[StepHandler]:
@@ -254,7 +272,9 @@ class AgentDI(BaseDI):
             UnderstandStep(LangChainIntentClassifier(models, window, logger), logger),
             PlanStep(LangChainPlanner(models, window, logger), toolbox),
             ClarifyStep(),
-            ActStep(LangChainActor(models, window, logger), toolbox),
+            ActStep(
+                LangChainActor(models, window, logger, WholeReply(), self._final_reply()), toolbox
+            ),
             RunToolsStep(toolbox),
             ReviewStep(LangChainReviewer(models, logger), logger),
             FeedbackStep(logger),

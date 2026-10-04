@@ -1,3 +1,4 @@
+from agent_orchestrator.adapter.outbound.llm.langchain.plan_request import REQUEST_PLAN
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.clock import utc_now
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.tool_catalog import tool_catalog
 from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
@@ -56,13 +57,10 @@ Example inside python_executor (heavy analysis only):
     saved = file_writer(file_path="report.md", data=report_text)
     result = saved["path"]"""
 
-PLAN_REQUEST: str = "NEEDS_PLAN:"
-
 _DIRECT = f"""\
 You cannot run tools in this reply. Answer from the conversation and general knowledge.
 Questions about your tools or what you can do are answered from the list above.
-Only if the answer needs to run one of your tools, reply with exactly one line instead:
-{PLAN_REQUEST} <what the answer needs>"""
+Only if the answer needs to run one of your tools, call {REQUEST_PLAN} instead of answering."""
 
 _FEEDBACK = """\
 A reviewer rejected your last answer.
@@ -82,11 +80,3 @@ def act_system_prompt(request: str, plan_steps: str | None, tools: list[ToolSpec
 
 def act_feedback(critique: str) -> str:
     return _FEEDBACK.format(critique=critique)
-
-
-def plan_request(reply: str) -> str | None:
-    for line in reply.splitlines():
-        stripped = line.strip()
-        if stripped.startswith(PLAN_REQUEST):
-            return stripped.removeprefix(PLAN_REQUEST).strip()
-    return None

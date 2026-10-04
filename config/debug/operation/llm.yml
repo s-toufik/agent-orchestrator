@@ -11,7 +11,6 @@ operation:
       max_output_tokens: 4096
       max_context_tokens: 16384
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   qwen3_5-0_8b:
@@ -26,7 +25,6 @@ operation:
       max_output_tokens: 8192
       max_context_tokens: 32768
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   qwen3-1_7b:
@@ -41,7 +39,6 @@ operation:
       max_output_tokens: 8192
       max_context_tokens: 32768
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   qwen3_5-2b:
@@ -56,7 +53,6 @@ operation:
       max_output_tokens: 8192
       max_context_tokens: 32768
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   lfm2-8b-a1b:
@@ -71,7 +67,6 @@ operation:
       max_output_tokens: 4096
       max_context_tokens: 16384
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   ministral-8b-instruct-2410:
@@ -86,7 +81,6 @@ operation:
       max_output_tokens: 4096
       max_context_tokens: 16384
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   gigachat3_1-10b-a1_8b:
@@ -101,7 +95,6 @@ operation:
       max_output_tokens: 4096
       max_context_tokens: 16384
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
 
   qwen3-14b:
@@ -116,7 +109,6 @@ operation:
       max_output_tokens: 4096
       max_context_tokens: 16384
       max_iterations: 20
-      use_streaming: true
       reasoning_effort: null
   # ------------------------------------------- NVIDIA Models
   nemotron-3-super-120b-a12b:
@@ -132,7 +124,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   gpt-oss-20b:
@@ -148,7 +139,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   deepseek-v4_1-flash:
@@ -164,7 +154,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   nemotron-3-ultra-550b-a55b:
@@ -180,7 +169,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   nemotron-3_5-lightning-30b-a3b:
@@ -196,7 +184,6 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
 
   nemotron-3-nano-omni-30b-a3b-reasoning:
@@ -212,5 +199,4 @@ operation:
       max_context_tokens: 16384
       max_iterations: 20
       max_reflection_retries: 2
-      use_streaming: true
       reasoning_effort: null
