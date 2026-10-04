@@ -34,12 +34,26 @@ make run
 | | Endpoint |
 |---|---|
 | Chat (SSE) | `POST http://<host>:<port>/v1/stream` |
+| Models | `GET http://<host>:<port>/v1/models` |
 | Health | `GET http://<host>:<port>/actuator/health` (also `/health/liveness`, `/health/readiness`) |
 | Version | `GET http://<host>:<port>/actuator/info` |
 
 `/health/readiness` answers `503` until the agent has booted, then `200`. The boot log lists the tools found on each MCP server; a server that is down is skipped with a warning.
 
 With Docker: `make docker_build` builds the image; it reads its configuration from `/app/config` and takes the environment variables below.
+
+### List the models
+
+`GET /v1/models` returns the models a request may name, and the steps that always use one model whatever the request asks:
+
+```json
+{
+  "models": [{ "name": "qwen3-8b", "context_tokens": 16384, "max_output_tokens": 4096, "thinking": false }],
+  "pinned_steps": { "act": "<model>", "understand": "<model>" }
+}
+```
+
+A client builds its model picker from `models` rather than keeping its own list. When `pinned_steps` covers every step, the choice has no effect on which model answers.
 
 ### Send a message
 
@@ -156,7 +170,7 @@ A pending plan survives while you discuss it (a revision or an unclear message) 
 | `use_streaming` | Also send the answer as a `token` event before `final` | `false` |
 | `reasoning_effort` | `null`: no thinking. `low` / `medium` / `high`: think first (slower, needs a larger `max_output_tokens`) | `null` |
 
-To add a model: add its entry, list it under `operation:` in `config/root.yml`, and add it to your client's model list. An entry's key cannot contain a dot: write `qwen3_5-2b` as the key and `model: qwen3.5-2b` in its parameters.
+To add a model: add its entry, list it under `operation:` in `config/root.yml`, and restart; it then appears in `GET /v1/models`. An entry's key cannot contain a dot: write `qwen3_5-2b` as the key and `model: qwen3.5-2b` in its parameters.
 
 **Model per step** (`operation/agent.yml`): every step that calls a model has an entry named after its role — today `agent_context` (understand), `agent_plan`, `agent_act` (answer and tools), `agent_reflection` (review) and `agent_summary`. A step added later that calls a model gets its own entry the same way.
 

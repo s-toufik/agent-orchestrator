@@ -4,12 +4,16 @@ from fastapi import APIRouter
 from pycraftcore.application_configuration import ApplicationConfiguration
 from pycraftcore.logger.port import Logger
 
+from agent_orchestrator.adapter.inbound.web.controller.list_models_controller import (
+    ListModelsController,
+)
 from agent_orchestrator.adapter.inbound.web.controller.stream_agent_controller import (
     StreamAgentController,
 )
 from agent_orchestrator.adapter.outbound.event.queue_turn_event_stream import QueueTurnEventStream
 from bootstrap.di.agent_di import AgentDI
 from bootstrap.router.actuator.actuator_router import ActuatorRouter
+from bootstrap.router.agent.list_models_router import ListModelsRouter
 from bootstrap.router.agent.stream_agent_router import StreamAgentRouter
 from src import (
     APPLICATION_AUTHORS_EMAIL,
@@ -51,6 +55,7 @@ class AgentContainer(AgentDI):
 
     async def _create_routers(self):
         self._routers.append(await self._stream_agent_router())
+        self._routers.append(self._list_models_router())
         self._routers.append(self._actuator_router())
 
     async def _stream_agent_router(self) -> APIRouter:
@@ -61,6 +66,10 @@ class AgentContainer(AgentDI):
             max_concurrent_streams=self._settings.max_concurrent_streams,
         )
         return StreamAgentRouter(controller).router
+
+    def _list_models_router(self) -> APIRouter:
+        controller = ListModelsController(self._list_models(), self._logging)
+        return ListModelsRouter(controller).router
 
     @staticmethod
     def _actuator_router() -> APIRouter:

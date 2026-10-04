@@ -74,6 +74,7 @@ from agent_orchestrator.application.step.step_handler import StepHandler
 from agent_orchestrator.application.step.summarize_step import SummarizeStep
 from agent_orchestrator.application.step.understand_step import UnderstandStep
 from agent_orchestrator.application.use_case.handle_message import HandleMessage
+from agent_orchestrator.application.use_case.list_models import ListModels
 from agent_orchestrator.domain.workflow.turn_policy import TurnPolicy
 from bootstrap.di.base_di import BaseDI
 
@@ -233,6 +234,9 @@ class AgentDI(BaseDI):
     async def _handle_message(self) -> HandleMessage:
         runner = await self._workflow_runner(await self._toolbox(), await self._checkpointer())
         return HandleMessage(runner, self._model_catalog, self._logging)
+
+    def _list_models(self) -> ListModels:
+        return ListModels(self._model_catalog)
 
     async def _workflow_runner(
         self, toolbox: Toolbox, checkpointer: Any

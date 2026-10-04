@@ -7,6 +7,7 @@ from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Message
 from agent_orchestrator.domain.event.turn_event import TurnEvent
 from agent_orchestrator.domain.exception.unknown_model_exception import UnknownModelException
+from agent_orchestrator.domain.model.model_listing import ModelListing, SelectableModel
 from agent_orchestrator.domain.tool.tool_call import ToolCall
 from agent_orchestrator.domain.tool.tool_result import ToolResult
 from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
@@ -92,6 +93,12 @@ class EchoExecutor:
         return ToolResult(call.id, call.name, f"{call.name}:{call.arguments.get('text', '')}")
 
 
+LISTING = ModelListing(
+    models=(SelectableModel("m", context_tokens=8_000, max_output_tokens=1_000, thinking=False),),
+    pinned_steps={Step.UNDERSTAND: "small"},
+)
+
+
 class FakeModels:
     def __init__(self, settings: TurnSettings | None = None) -> None:
         self._settings = settings or TurnSettings()
@@ -100,6 +107,9 @@ class FakeModels:
         if model == "unknown":
             raise UnknownModelException(model)
         return self._settings
+
+    def listing(self) -> ModelListing:
+        return LISTING
 
 
 class ListEventStream:

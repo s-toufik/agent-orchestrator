@@ -18,7 +18,9 @@ from agent_orchestrator.domain.exception.agent_unavailable_exception import (
     AgentUnavailableException,
 )
 from agent_orchestrator.domain.exception.unknown_model_exception import UnknownModelException
+from agent_orchestrator.domain.model.model_listing import ModelListing, SelectableModel
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
+from agent_orchestrator.domain.workflow.step import Step
 from tests.agent_orchestrator.adapter.outbound.llm.langchain.fakes import FakeLLM
 
 CONNECTOR = ModelConnector(base_url="http://llm:8080/v1", api_key=SecretStr("k"))
@@ -130,3 +132,19 @@ def test_tokens_are_estimated_from_words_and_punctuation() -> None:
     assert count_tokens("hello world") == 2
     assert count_tokens("file.md") == 2
     assert EstimatedTokenCounter().count([Message(Speaker.USER, "hello world")]) == 6
+
+
+def test_the_listing_names_every_selectable_model_and_the_steps_pinned_to_one() -> None:
+    thinking = ModelCatalog(
+        models={**CATALOG.models, "deep": (CONNECTOR, _parameters("deep", reasoning_effort="low"))},
+        roles=CATALOG.roles,
+    )
+
+    assert thinking.listing() == ModelListing(
+        models=(
+            SelectableModel("small", context_tokens=500, max_output_tokens=100, thinking=False),
+            SelectableModel("big", context_tokens=1_000, max_output_tokens=100, thinking=False),
+            SelectableModel("deep", context_tokens=1_000, max_output_tokens=100, thinking=True),
+        ),
+        pinned_steps={Step.UNDERSTAND: "small"},
+    )
