@@ -13,8 +13,6 @@ def node_name(step: Step) -> str:
 
 
 class PolicyRouter:
-    """The conditional edges: the policy picks the next step from the domain turn."""
-
     def __init__(self, policy: TurnPolicy, codec: TurnStateCodec) -> None:
         self._policy = policy
         self._codec = codec

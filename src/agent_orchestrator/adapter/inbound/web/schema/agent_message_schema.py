@@ -13,5 +13,4 @@ class AgentMessageSchema(BaseModel):
     message_type: AgentMessageType = AgentMessageType.TEXT
 
     def serialize(self) -> bytes:
-        # SSE framing
         return f"event: {self.message_status.value}\ndata: {self.model_dump_json()}\n\n".encode()

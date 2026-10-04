@@ -13,8 +13,6 @@ from agent_orchestrator.domain.workflow.turn_policy import FIRST_STEP, TurnPolic
 
 
 class AgentGraphBuilder:
-    """The agent's graph: one node per step, edges declared by the policy's transitions."""
-
     def __init__(
         self, nodes: Sequence[AgentNode], policy: TurnPolicy, router: PolicyRouter
     ) -> None:

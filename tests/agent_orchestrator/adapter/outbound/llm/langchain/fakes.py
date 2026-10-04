@@ -6,8 +6,6 @@ from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 
 
 class FakeLLM:
-    """Stands for a LangChain chat model: scripted replies, recorded prompts and bindings."""
-
     def __init__(self, replies: list[Any] | None = None, parsed: list[Any] | None = None) -> None:
         self._replies = list(replies or [])
         self._parsed = list(parsed or [])

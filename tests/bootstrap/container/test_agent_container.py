@@ -18,7 +18,6 @@ REAL_CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 @pytest.fixture(autouse=True)
 def _base_env(monkeypatch, tmp_path):
-    # Keep telemetry local: otherwise the OTEL_HOST from .env makes the test depend on the network.
     monkeypatch.setenv("OTEL_HOST", "")
     monkeypatch.setenv("OTEL_PORT", "4317")
     monkeypatch.setenv("USER_DB_HOST", str(tmp_path))
@@ -109,4 +108,4 @@ async def test_stop_after_boot_does_not_raise(running_toolbox, monkeypatch) -> N
     container = AgentContainer(make_settings())
     await container.boot()
 
-    await container.stop()  # must not raise
+    await container.stop()

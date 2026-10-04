@@ -44,7 +44,6 @@ def create_agent_application(settings: ProcessSettings | None = None) -> FastAPI
 
     application.add_middleware(RequestIDMiddleware)
     application.add_middleware(RequestMiddleware)
-    # noinspection PyTypeChecker
     application.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

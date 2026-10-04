@@ -72,7 +72,6 @@ async def test_admission_is_released_after_a_stream_completes(logger) -> None:
     response = await controller.execute(REQUEST)
     await _drain(response)
 
-    # A second stream must be able to acquire the single permit again.
     response2 = await controller.execute(REQUEST)
     await _drain(response2)
 
@@ -88,8 +87,6 @@ async def test_admission_is_released_when_setup_itself_raises(logger) -> None:
     with pytest.raises(RuntimeError, match="queue construction failed"):
         await controller.execute(REQUEST)
 
-    # The permit must have been released, or a second call would hang forever
-    # waiting on the semaphore -- prove it by acquiring it with a timeout.
     await asyncio.wait_for(controller._admission.acquire(), timeout=1)
 
 

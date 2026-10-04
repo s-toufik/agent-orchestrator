@@ -16,7 +16,6 @@ FIRST_STEP: Step = Step.UNDERSTAND
 
 
 class TurnPolicy:
-    # Read top to bottom: after a step, the first transition whose condition holds is taken.
     TRANSITIONS: tuple[Transition, ...] = (
         Transition(Step.UNDERSTAND, Step.PLAN, needs_plan),
         Transition(Step.UNDERSTAND, Step.CLARIFY, is_ambiguous),

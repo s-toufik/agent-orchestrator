@@ -28,12 +28,10 @@ class Turn:
     verdicts: list[Verdict] = field(default_factory=list)
     answer: Answer | None = None
 
-    # ------------------------------------------------------------------ changes
     def understood(self, understanding: Understanding) -> None:
         self.understanding = understanding
 
     def execute(self, plan: Plan) -> None:
-        # What was done before the plan was approved is not part of carrying it out.
         self.plan = plan
         self.work = []
         self.verdicts = []
@@ -63,7 +61,6 @@ class Turn:
             return Answer.best_effort(draft.text)
         return Answer.answered(draft.text)
 
-    # ---------------------------------------------------------------- questions
     @property
     def query(self) -> str:
         return self.understanding.query if self.understanding else self.request
@@ -103,5 +100,4 @@ class Turn:
 
     @property
     def is_plain_direct_answer(self) -> bool:
-        # A direct answer made without tools has no evidence to be checked against.
         return self.intent is Intent.DIRECT and not self.used_tools

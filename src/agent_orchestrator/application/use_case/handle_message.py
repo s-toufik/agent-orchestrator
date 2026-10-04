@@ -20,8 +20,6 @@ AGENT_UNAVAILABLE_MESSAGE: str = (
 
 
 class HandleMessage:
-    """Answer one user message: run a turn on the conversation and report what happens."""
-
     def __init__(self, workflow: WorkflowRunner, models: ModelRegistry, logger: Logger) -> None:
         self._workflow = workflow
         self._models = models

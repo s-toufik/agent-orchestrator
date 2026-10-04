@@ -70,7 +70,6 @@ def test_the_agent_never_imports_a_toolbox_package_directly() -> None:
 
 
 def test_langgraph_nodes_only_delegate_to_the_application() -> None:
-    # Models and tools are reached through the steps' ports, never from a graph node.
     forbidden = {
         "agent_orchestrator.adapter.outbound.llm",
         "agent_orchestrator.adapter.outbound.tool",

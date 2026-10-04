@@ -9,8 +9,6 @@ ModelSettings = tuple[ModelConnector, ModelParameters]
 
 
 class AgentRole(StrEnum):
-    """The model-calling steps; the value is the role's operation in agent.yml."""
-
     ACT = "agent_act"
     CONTEXT = "agent_context"
     PLAN = "agent_plan"
@@ -20,11 +18,6 @@ class AgentRole(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ModelCatalog:
-    """The selectable models (by the name the UI sends) and the roles frozen to a model.
-
-    A role absent from `roles` follows the model selected for the turn.
-    """
-
     models: dict[str, ModelSettings]
     roles: dict[AgentRole, ModelSettings] = field(default_factory=dict)
 

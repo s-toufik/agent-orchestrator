@@ -6,6 +6,4 @@ from agent_orchestrator.domain.turn.verdict import Verdict
 
 
 class Reviewer(Protocol):
-    async def review(self, conversation: Conversation, turn: Turn) -> Verdict | None:
-        """Judge the turn's last draft; None when the judgement is unreadable."""
-        ...
+    async def review(self, conversation: Conversation, turn: Turn) -> Verdict | None: ...

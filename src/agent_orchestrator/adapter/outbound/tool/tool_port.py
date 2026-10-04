@@ -7,8 +7,6 @@ from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 @runtime_checkable
 class ToolPort(Protocol):
-    """One callable tool, whatever serves it (an MCP server today)."""
-
     @property
     def specification(self) -> ToolSpecification: ...
 

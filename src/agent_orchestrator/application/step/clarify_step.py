@@ -5,8 +5,6 @@ from agent_orchestrator.domain.workflow.step import Step
 
 
 class ClarifyStep:
-    """The question was written while understanding the message: no model call."""
-
     step = Step.CLARIFY
 
     async def run(self, conversation: Conversation, turn: Turn) -> None:

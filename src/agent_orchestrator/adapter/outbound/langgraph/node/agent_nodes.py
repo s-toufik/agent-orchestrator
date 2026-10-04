@@ -14,7 +14,6 @@ from agent_orchestrator.adapter.outbound.langgraph.state.turn_state_codec import
 from agent_orchestrator.application.step.step_handler import StepHandler
 from agent_orchestrator.domain.workflow.step import Step
 
-# The node class that runs each step.
 NODE_TYPES: tuple[type[AgentNode], ...] = (
     UnderstandNode,
     PlanNode,

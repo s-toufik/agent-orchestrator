@@ -28,7 +28,6 @@ class TurnStateCodec:
         return self._turn.validate_python(state["turn"])
 
     def stored_conversation(self, values: dict[str, Any]) -> Conversation | None:
-        """The conversation of a stored checkpoint; None when absent or in an older format."""
         stored = values.get("conversation")
         if stored is None:
             return None

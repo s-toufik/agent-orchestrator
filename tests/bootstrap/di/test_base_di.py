@@ -125,21 +125,19 @@ def test_telemetry_provider_service_name_is_derived_from_the_role(monkeypatch) -
     provider = di._telemetry_provider
 
     assert provider is not None
-    # Without an otlp_endpoint this spins up a BatchSpanProcessor with a real
-    # background thread -- shut it down or it leaks across the whole suite.
     provider.shutdown()
 
 
 async def test_shutdown_telemetry_is_a_no_op_when_never_constructed() -> None:
     di = BaseDI(make_settings())
 
-    await di._shutdown_telemetry()  # must not raise
+    await di._shutdown_telemetry()
 
 
 async def test_shutdown_telemetry_shuts_down_and_evicts_the_cached_provider(monkeypatch) -> None:
     _set_required_env(monkeypatch)
     di = BaseDI(make_settings())
-    _ = di._telemetry_provider  # force construction
+    _ = di._telemetry_provider
     assert "_telemetry_provider" in di.__dict__
 
     await di._shutdown_telemetry()

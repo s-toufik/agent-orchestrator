@@ -5,8 +5,6 @@ from agent_orchestrator.domain.event.turn_event import TurnEvent
 
 
 class QueueTurnEventStream:
-    """One request's events, handed from the running turn to the HTTP response."""
-
     def __init__(self) -> None:
         self._queue: asyncio.Queue[TurnEvent | None] = asyncio.Queue()
 

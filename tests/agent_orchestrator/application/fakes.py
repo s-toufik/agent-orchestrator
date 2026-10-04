@@ -1,5 +1,3 @@
-"""Fake ports for application tests: scripted answers, recorded calls, no LLM."""
-
 import copy
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
@@ -30,7 +28,6 @@ class Scripted:
         self.calls: list[tuple[Conversation, Turn]] = []
 
     def _next(self, conversation: Conversation, turn: Turn) -> Any:
-        # A snapshot: the live objects keep changing after the call.
         self.calls.append((copy.deepcopy(conversation), copy.deepcopy(turn)))
         reply = self._replies.pop(0)
         if isinstance(reply, Exception):
@@ -122,8 +119,6 @@ class ListEventStream:
 
 
 class InMemoryWorkflowRunner:
-    """The workflow without LangGraph: the same steps and policy, conversations in a dict."""
-
     def __init__(self, steps: Sequence[StepHandler], policy: TurnPolicy) -> None:
         self._steps = {handler.step: handler for handler in steps}
         self._policy = policy

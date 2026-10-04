@@ -9,6 +9,4 @@ from agent_orchestrator.domain.turn.turn import Turn
 class Actor(Protocol):
     async def act(
         self, conversation: Conversation, turn: Turn, tools: list[ToolSpecification]
-    ) -> Draft:
-        """The next draft: an answer, or tool calls (only under an approved plan)."""
-        ...
+    ) -> Draft: ...

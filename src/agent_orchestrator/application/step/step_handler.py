@@ -6,8 +6,6 @@ from agent_orchestrator.domain.workflow.step import Step
 
 
 class StepHandler(Protocol):
-    """One step of a turn: call one port, record the result on the turn or the conversation."""
-
     @property
     def step(self) -> Step: ...
 

@@ -30,7 +30,6 @@ class LangChainActor:
         tail = [HumanMessage(content=turn.request), *from_work(turn.work)]
         messages = self._window.build(system, conversation, turn.settings.context_tokens, tail)
         model = self._models.for_role(AgentRole.ACT, turn.model)
-        # Tools are bound only under an approved plan; providers reject an empty tool list.
         if plan is not None and tools:
             model = model.bind_tools([_tool(spec) for spec in tools])
         self._logger.debug(f"Calling the act model (step {turn.steps_taken + 1})")

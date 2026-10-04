@@ -1,5 +1,3 @@
-"""Translation between the domain's conversation and turn work and LangChain messages."""
-
 import uuid
 from collections.abc import Sequence
 from typing import Any

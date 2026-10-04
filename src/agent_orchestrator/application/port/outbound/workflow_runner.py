@@ -6,7 +6,4 @@ from agent_orchestrator.domain.turn.turn import Turn
 
 
 class WorkflowRunner(Protocol):
-    def run(self, conversation_id: str, turn: Turn) -> AsyncIterator[TurnEvent]:
-        """Run the turn's steps on the stored conversation, keep the conversation, and yield
-        what happens, ending with the finished event."""
-        ...
+    def run(self, conversation_id: str, turn: Turn) -> AsyncIterator[TurnEvent]: ...

@@ -1,6 +1,3 @@
-"""Whole turns, on both runners: the plain loop and the graph LangGraph generates from the
-policy. Both must give the same answers, the same events and the same stored conversation."""
-
 from collections.abc import AsyncIterator
 from typing import TypedDict
 
@@ -59,8 +56,6 @@ CONVERSATION = "c1"
 
 
 class Agent:
-    """The steps wired on fake ports, run by the runner under test."""
-
     def __init__(
         self,
         runner_kind: str,
@@ -180,7 +175,6 @@ async def test_a_task_is_planned_approved_then_executed_with_tools(runner_kind, 
     assert executed.plan is not None and executed.query == "say hi"
     reviewed: Turn = agent.reviewer.calls[0][1]
     assert [result.output for result in reviewed.evidence] == ["echo:hi"]
-    # The plan proposed in the first turn was stored, then taken by the approval.
     assert agent.classifier.calls[-1][0].pending_plan is not None
     stored = await agent.stored()
     assert [m.speaker for m in stored.messages] == [Speaker.USER, Speaker.ASSISTANT] * 2
@@ -205,7 +199,7 @@ async def test_a_follow_up_is_understood_against_the_conversation(runner_kind, l
 
     assert first.answer is not None and first.answer.outcome is Outcome.ANSWERED
     assert answer.answer is not None and answer.answer.text == "For agents, ..."
-    assert len(agent.reviewer.calls) == 1  # the plain direct answer was not reviewed
+    assert len(agent.reviewer.calls) == 1
     history = agent.classifier.calls[-1][0].messages
     assert [m.text for m in history] == ["what is VaR?", "VaR is a loss quantile."]
 

@@ -8,7 +8,6 @@ _MESSAGE_OVERHEAD = 4
 
 
 def count_tokens(text: str) -> int:
-    """A cheap estimate: words, plus one per punctuation run inside them."""
     if not text:
         return 0
     return sum(1 + len(_SEPARATOR.findall(word)) for word in text.split())

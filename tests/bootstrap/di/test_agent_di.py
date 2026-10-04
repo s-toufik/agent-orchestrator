@@ -107,13 +107,13 @@ async def test_close_mcp_session_factories_is_a_no_op_when_never_built() -> None
         **{MCP_CONNECTOR_NAME: _connector("toolbox", "http://localhost:8001/mcp")}
     )
 
-    await di._close_mcp_session_factories()  # must not raise
+    await di._close_mcp_session_factories()
 
 
 async def test_close_llm_http_client_is_a_no_op_when_never_built() -> None:
     di = AgentDI(make_settings())
 
-    await di._close_llm_http_client()  # must not raise
+    await di._close_llm_http_client()
 
 
 class _FakeMcpSession:
@@ -187,9 +187,6 @@ async def test_toolbox_is_empty_but_usable_when_no_mcp_server_answers() -> None:
 
 
 async def test_checkpointer_opens_a_real_sqlite_connection() -> None:
-    # No real MongoDB is running, so _checkpointer() falls back to sqlite,
-    # which is what this test is exercising. _base_env already sets the
-    # sqlite/mongo env vars the config tree needs to resolve.
     di = AgentDI(make_settings())
 
     checkpointer = await di._checkpointer()

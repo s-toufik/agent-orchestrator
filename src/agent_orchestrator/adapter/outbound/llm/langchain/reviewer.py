@@ -14,7 +14,6 @@ from agent_orchestrator.domain.conversation.message import Speaker
 from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.verdict import Verdict
 
-# The previous exchange gives the latest message its meaning.
 _PREVIOUS_MESSAGES: int = 2
 
 

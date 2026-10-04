@@ -74,9 +74,6 @@ class BaseDI:
     async def _shutdown_telemetry(self) -> None:
         provider = self.__dict__.pop("_telemetry_provider", None)
         if provider is not None:
-            # Detached first: lines logged after the provider is shut down would hit a closed
-            # exporter.
             if self._telemetry_log_handler is not None:
                 logging.getLogger().removeHandler(self._telemetry_log_handler)
-            # TracerProvider.shutdown() flushes buffered spans and can block on I/O.
             await asyncio.to_thread(provider.shutdown)

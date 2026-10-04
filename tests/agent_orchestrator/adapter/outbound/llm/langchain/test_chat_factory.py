@@ -29,8 +29,6 @@ def test_create_chat_client_applies_every_configured_field() -> None:
 
 
 def test_the_langchain_openai_sdk_retries_are_disabled() -> None:
-    # Retry/circuit-breaking live in the resilient transport; the SDK's own
-    # internal retry loop must be off or the two stack on top of each other.
     connector = ModelConnector(base_url="http://example.com", api_key=SecretStr("key"))
     parameters = ModelParameters(
         model_name="m",

@@ -8,7 +8,6 @@ from pydantic import SecretStr
 from agent_orchestrator.adapter.outbound.llm.enum.reasoning_effort import ReasoningEffort
 from agent_orchestrator.adapter.outbound.llm.schema import ModelConnector, ModelParameters
 
-# A local server needs no key, but OpenAI-compatible clients refuse an empty one.
 NO_KEY: str = "No_Key"
 
 
@@ -39,11 +38,9 @@ class ModelSettingsMapper:
 
 
 def _reasoning_effort(value: object) -> ReasoningEffort | None:
-    # null in llm.yml: the model does not reason, so nothing is sent.
     return ReasoningEffort(str(value)) if value else None
 
 
 def connector_api_key(connector: ApiConnector) -> str | None:
-    # A hosted provider (OpenRouter...) authenticates with the connector's token as a Bearer key.
     auth = connector.auth
     return auth.key_value if isinstance(auth, TokenAuth) and auth.key_value else None

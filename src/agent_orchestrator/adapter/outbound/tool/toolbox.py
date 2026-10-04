@@ -8,8 +8,6 @@ from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 
 
 class Toolbox:
-    """The tools discovered at boot: what they are, and running them."""
-
     def __init__(self, registry: ToolRegistry, logger: Logger) -> None:
         self._registry = registry
         self._logger = logger

@@ -6,6 +6,4 @@ from agent_orchestrator.domain.turn.understanding import Understanding
 
 
 class IntentClassifier(Protocol):
-    async def understand(self, conversation: Conversation, turn: Turn) -> Understanding | None:
-        """How the latest message reads against the conversation; None when unreadable."""
-        ...
+    async def understand(self, conversation: Conversation, turn: Turn) -> Understanding | None: ...

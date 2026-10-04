@@ -85,9 +85,6 @@ SQLITE_CHECKPOINTER: str = "sqlite_checkpointer"
 
 
 class AgentDI(BaseDI):
-    """Wiring only: configuration in, adapters, steps, runner and use case out."""
-
-    # ------------------------------------------------------------------ tools
     @cached_property
     def _mcp_connectors(self) -> dict[str, McpConnector]:
         connectors: Mapping[str, McpConnector] = self._configuration.connector[ConnectorType.mcp]
@@ -117,7 +114,6 @@ class AgentDI(BaseDI):
     async def _discover_tools(
         self, name: str, factory: StreamableHttpSessionFactory
     ) -> list[ToolPort]:
-        # Tools are optional: a server that is down or advertises nothing is skipped.
         try:
             discovered: list[ToolPort] = await McpToolProvider(factory, required=False).tools()
         except Exception as exception:
@@ -129,7 +125,6 @@ class AgentDI(BaseDI):
         )
         return discovered
 
-    # -------------------------------------------------------------------- llm
     @cached_property
     def _llm_transport_factory(self) -> ResilientTransportFactory:
         connector: ApiConnector = self._configuration.connector.api(LLM_CONNECTOR_NAME)
@@ -172,7 +167,6 @@ class AgentDI(BaseDI):
 
     @cached_property
     def _model_catalog(self) -> ModelCatalog:
-        # Every API operation is a selectable model, except the agent roles of agent.yml.
         roles: set[str] = {role.value for role in AgentRole}
         models: dict[str, ModelSettings] = {}
         for name, operation in self._configuration.operation.by_name.items():
@@ -183,7 +177,6 @@ class AgentDI(BaseDI):
         return ModelCatalog(models=models, roles=self._frozen_roles())
 
     def _frozen_roles(self) -> dict[AgentRole, ModelSettings]:
-        # A role with `model: null` is left out: it follows the model selected for the turn.
         frozen: dict[AgentRole, ModelSettings] = {}
         for role in AgentRole:
             operation = self._configuration.operation.by_name.get(role.value)
@@ -195,7 +188,6 @@ class AgentDI(BaseDI):
     def _chat_models(self) -> ChatModels:
         return ChatModels(self._model_catalog, self._llm_http_client)
 
-    # ------------------------------------------------------------ persistence
     def _database_connector(self, connector_name: str) -> DatabaseConnector:
         return self._configuration.connector.database(connector_name)
 
@@ -238,7 +230,6 @@ class AgentDI(BaseDI):
             await factory.disconnect()
             return None
 
-    # --------------------------------------------------------------- workflow
     async def _handle_message(self) -> HandleMessage:
         runner = await self._workflow_runner(await self._toolbox(), await self._checkpointer())
         return HandleMessage(runner, self._model_catalog, self._logging)

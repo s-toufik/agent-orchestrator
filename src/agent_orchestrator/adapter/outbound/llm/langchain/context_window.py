@@ -16,8 +16,6 @@ def count_message_tokens(messages: Sequence[BaseMessage]) -> int:
 
 
 class ContextWindow:
-    """What a model sees of the conversation: the most recent history that fits the budget."""
-
     def build(
         self,
         system: str,

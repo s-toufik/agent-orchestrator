@@ -15,7 +15,6 @@ class ChatModels:
         connector, parameters = self._catalog.settings_for(role, model)
         key = (connector.base_url, parameters.model_dump_json())
         if key not in self._clients:
-            # The answer is sent once settled, never token by token from the model.
             unstreamed = parameters.model_copy(update={"use_streaming": False})
             self._clients[key] = LLMChat(
                 connector, unstreamed, self._http_client

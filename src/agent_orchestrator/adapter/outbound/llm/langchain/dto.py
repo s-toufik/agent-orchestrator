@@ -1,5 +1,3 @@
-"""What the structured-output models return, mapped onto the domain."""
-
 from pydantic import BaseModel, Field
 
 from agent_orchestrator.domain.turn.intent import Intent

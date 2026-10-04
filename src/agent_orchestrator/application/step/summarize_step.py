@@ -10,8 +10,6 @@ KEEP_LAST_MESSAGES: int = 4
 
 
 class SummarizeStep:
-    """Fold older messages into the summary once the history passes half the context."""
-
     step = Step.SUMMARIZE
 
     def __init__(
@@ -36,7 +34,6 @@ class SummarizeStep:
                 turn, conversation.summary, conversation.older_than(self._keep_last)
             )
         except Exception as exception:
-            # The answer is already given; a failed summary only delays compaction.
             self._logger.warning(f"Summary failed, history kept as is: {exception}")
             return
         conversation.compact(summary, self._keep_last)

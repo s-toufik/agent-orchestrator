@@ -16,8 +16,6 @@ class TurnEventKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class TurnEvent:
-    """What happened during a turn. How it is shown to the user is the inbound adapter's job."""
-
     kind: TurnEventKind
     step: Step | None = None
     tools: tuple[str, ...] = field(default_factory=tuple)

@@ -14,7 +14,6 @@ class Understanding:
 
     @classmethod
     def fallback(cls, message: str) -> Understanding:
-        # Treating an unreadable message as a task is safe: it leads to a plan to approve.
         return cls(intent=Intent.TASK, query=message)
 
     def normalized(self, has_pending_plan: bool) -> Understanding:

@@ -17,7 +17,6 @@ class ReviewStep:
     async def run(self, conversation: Conversation, turn: Turn) -> None:
         verdict = await self._reviewer.review(conversation, turn)
         if verdict is None:
-            # A broken judge must not block the user's answer.
             self._logger.warning("The review could not be read; accepting the draft")
             verdict = Verdict.accept()
         turn.reviewed(verdict)

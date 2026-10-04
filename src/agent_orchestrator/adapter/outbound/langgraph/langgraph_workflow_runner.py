@@ -39,7 +39,6 @@ class LangGraphWorkflowRunner:
     @staticmethod
     def _config(conversation_id: str, turn: Turn) -> dict[str, Any]:
         settings = turn.settings
-        # One superstep per step: acting and tools alternate, each retry adds a review cycle.
         limit = 10 + 2 * settings.max_steps + 3 * settings.max_retries
         return {"configurable": {"thread_id": conversation_id}, "recursion_limit": limit}
 

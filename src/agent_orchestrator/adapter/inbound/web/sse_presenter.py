@@ -14,7 +14,6 @@ STEP_STATUS: dict[Step, str] = {
 
 
 class SsePresenter:
-
     def present(self, event: TurnEvent, session_id: str) -> list[bytes]:
         match event.kind:
             case TurnEventKind.STEP_STARTED:

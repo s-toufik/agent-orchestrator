@@ -42,8 +42,6 @@ Example inside python_executor (heavy analysis only):
     saved = file_writer(file_path="report.md", data=report_text)
     result = saved["path"]"""
 
-# Outside a plan the model has no tool API: when the answer needs a tool, it says so in one
-# line. A plain line, because with tools bound models call them even for questions about them.
 PLAN_REQUEST: str = "NEEDS_PLAN:"
 
 _DIRECT = f"""\
@@ -71,7 +69,6 @@ def act_feedback(critique: str) -> str:
 
 
 def plan_request(reply: str) -> str | None:
-    """The reason given when the reply asks for a plan, on any line; None otherwise."""
     for line in reply.splitlines():
         stripped = line.strip()
         if stripped.startswith(PLAN_REQUEST):

@@ -12,9 +12,6 @@ from agent_orchestrator.domain.workflow.step import Step
 
 
 class AgentNode:
-    """A graph node running one step. The work is the step handler's; a subclass overrides
-    `work` only to use a LangGraph feature (interrupt, Send, a subgraph...)."""
-
     step: ClassVar[Step]
 
     def __init__(self, handler: StepHandler, codec: TurnStateCodec) -> None:
@@ -38,7 +35,6 @@ class AgentNode:
 
 
 def _emit(event: TurnEvent) -> None:
-    # Outside a streaming run (a node called directly) there is no writer.
     try:
         writer = get_stream_writer()
     except RuntimeError:

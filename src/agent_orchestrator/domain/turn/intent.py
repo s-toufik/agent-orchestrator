@@ -15,5 +15,4 @@ class Intent(StrEnum):
 
     @property
     def keeps_pending_plan(self) -> bool:
-        # A pending plan survives only while the user is still discussing it.
         return self in (Intent.PLAN_REVISION, Intent.AMBIGUOUS)
