@@ -14,14 +14,20 @@ application_configuration:
       toolbox: ${connector.toolbox}
 
   operation:
-    qwen3-8b: ${operation.qwen3-8b}
     qwen3_5-0_8b: ${operation.qwen3_5-0_8b}
-    qwen3-1_7b: ${operation.qwen3-1_7b}
     qwen3_5-2b: ${operation.qwen3_5-2b}
+    qwen3-1_7b: ${operation.qwen3-1_7b}
+    qwen3-8b: ${operation.qwen3-8b}
+    qwen3-14b: ${operation.qwen3-14b}
     lfm2-8b-a1b: ${operation.lfm2-8b-a1b}
     ministral-8b-instruct-2410: ${operation.ministral-8b-instruct-2410}
     gigachat3_1-10b-a1_8b: ${operation.gigachat3_1-10b-a1_8b}
-    qwen3-14b: ${operation.qwen3-14b}
+    gpt-oss-20b: ${operation.gpt-oss-20b}
+    deepseek-v4_1-flash: ${operation.deepseek-v4_1-flash}
+    nemotron-3-super-120b-a12b: ${operation.nemotron-3-super-120b-a12b}
+    nemotron-3-ultra-550b-a55b: ${operation.nemotron-3-ultra-550b-a55b}
+    nemotron-3_5-lightning-30b-a3b: ${operation.nemotron-3_5-lightning-30b-a3b}
+    nemotron-3-nano-omni-30b-a3b-reasoning: ${operation.nemotron-3-nano-omni-30b-a3b-reasoning}
     agent_act: ${operation.agent_act}
     agent_context: ${operation.agent_context}
     agent_plan: ${operation.agent_plan}

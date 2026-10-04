@@ -6,9 +6,9 @@ operation:
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: nvidia/nemotron-3-super-120b-a12b
+      model: nvidia/nemotron-3.5-lightning-30b-a3b
       temperature: 0.0
-      max_output_tokens: 8192
+      max_output_tokens: 1024
       max_context_tokens: 32768
       reasoning_effort: null
 
@@ -32,7 +32,7 @@ operation:
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: nvidia/nemotron-3-super-120b-a12b
+      model: null
       temperature: 0.0
       max_output_tokens: 4096
       max_context_tokens: 16384
@@ -48,7 +48,7 @@ operation:
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: nvidia/nemotron-3-super-120b-a12b
+      model: null
       temperature: 0.0
       max_output_tokens: 4096
       max_context_tokens: 16384
@@ -61,8 +61,8 @@ operation:
     endpoint: /chat/completions
     method: POST
     parameters:
-      model: nvidia/nemotron-3-super-120b-a12b
+      model: nvidia/nemotron-3.5-lightning-30b-a3b
       temperature: 0.0
-      max_output_tokens: 8192
+      max_output_tokens: 1024
       max_context_tokens: 32768
       reasoning_effort: null
