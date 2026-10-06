@@ -10,7 +10,6 @@ BUDGET_EXHAUSTED: str = (
     "I reached the step limit before finishing this task. "
     "Ask me to continue, or narrow the request."
 )
-APPROVAL_REQUEST: str = "{steps}\n\n---\nReply **yes** to run this plan, or tell me what to change."
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +35,7 @@ class Answer:
 
     @classmethod
     def approval_request(cls, plan: Plan) -> Answer:
-        return cls(APPROVAL_REQUEST.format(steps=plan.steps), Outcome.AWAITING_APPROVAL)
+        return cls(plan.steps, Outcome.AWAITING_APPROVAL)
 
     @classmethod
     def clarification(cls, question: str) -> Answer:

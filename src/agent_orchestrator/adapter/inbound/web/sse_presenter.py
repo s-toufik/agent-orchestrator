@@ -4,6 +4,8 @@ from agent_orchestrator.adapter.inbound.web.schema.agent_message_stream_schema i
 )
 from agent_orchestrator.adapter.inbound.web.schema.message_stream_type import MessageStreamType
 from agent_orchestrator.domain.event.turn_event import TurnEvent, TurnEventKind
+from agent_orchestrator.domain.turn.answer import Answer
+from agent_orchestrator.domain.turn.outcome import Outcome
 from agent_orchestrator.domain.workflow.step import Step
 
 STEP_STATUS: dict[Step, str] = {
@@ -11,6 +13,7 @@ STEP_STATUS: dict[Step, str] = {
     Step.PLAN: "Preparing a plan",
     Step.REVIEW: "Checking the answer",
 }
+APPROVAL_PROMPT: str = "Reply **yes** to run this plan, or tell me what to change."
 
 
 class SsePresenter:
@@ -45,7 +48,7 @@ class SsePresenter:
         answer = event.answer
         final = AgentMessageSchema(
             session_id=session_id,
-            content=answer.text if answer else "",
+            content=_content(answer) if answer else "",
             metadata={
                 "iteration": str(event.steps_taken),
                 "max_iteration": str(event.max_steps),
@@ -53,6 +56,12 @@ class SsePresenter:
             },
         ).serialize()
         return [final]
+
+
+def _content(answer: Answer) -> str:
+    if answer.outcome is Outcome.AWAITING_APPROVAL:
+        return f"{answer.text}\n\n---\n{APPROVAL_PROMPT}"
+    return answer.text
 
 
 def _stream(event_type: MessageStreamType, content: str) -> bytes:

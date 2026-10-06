@@ -70,12 +70,10 @@ def test_the_query_is_the_understood_request_or_the_raw_message() -> None:
     assert turn(None).query == "msg"
 
 
-def test_the_approval_request_shows_the_plan_and_how_to_approve_it() -> None:
+def test_the_approval_request_is_the_plan_awaiting_approval() -> None:
     approval = Answer.approval_request(PLAN)
 
-    assert approval.outcome is Outcome.AWAITING_APPROVAL
-    assert approval.text.startswith(PLAN.steps)
-    assert "Reply **yes**" in approval.text
+    assert (approval.text, approval.outcome) == (PLAN.steps, Outcome.AWAITING_APPROVAL)
 
 
 def test_a_plan_request_is_neither_an_answer_nor_tool_calls() -> None:

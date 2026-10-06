@@ -19,6 +19,7 @@ Write the plan in Markdown, exactly in this shape:
 ## Expected result
 One sentence.
 
+Write only the plan: no preamble, and do not ask the user to approve it.
 Use only the tools listed. Use the fewest steps that get the job done.
 For heavy analysis (many rows, aggregation, joins, statistics), plan a python_executor step.
 
