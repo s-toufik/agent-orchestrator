@@ -12,7 +12,7 @@ from agent_orchestrator.domain.tool.tool_call import ToolCall
 from agent_orchestrator.domain.tool.tool_result import ToolResult
 from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
 from agent_orchestrator.domain.turn.draft import Draft
-from agent_orchestrator.domain.turn.plan import Plan
+from agent_orchestrator.domain.turn.plan import Plan, PlannedStep
 from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
 from agent_orchestrator.domain.turn.understanding import Understanding
@@ -42,8 +42,9 @@ class FakeClassifier(Scripted):
 
 
 class FakePlanner(Scripted):
-    async def plan(self, conversation, turn, tools: list[ToolSpecification]) -> Plan:
-        return Plan(task=turn.query, steps=self._next(conversation, turn))
+    async def plan(self, conversation, turn, tools: list[ToolSpecification]) -> Plan | None:
+        steps: tuple[PlannedStep, ...] | None = self._next(conversation, turn)
+        return None if steps is None else Plan(task=turn.query, steps=steps)
 
 
 class FakeActor(Scripted):

@@ -14,7 +14,7 @@ POLICY = TurnPolicy()
     ("source", "targets"),
     [
         (Step.UNDERSTAND, [Step.PLAN, Step.CLARIFY, Step.ACT]),
-        (Step.ACT, [Step.PLAN, Step.FINISH, Step.RUN_TOOLS, Step.REVIEW]),
+        (Step.ACT, [Step.PLAN, Step.FINISH, Step.RUN_TOOLS, Step.ACT, Step.REVIEW]),
         (Step.REVIEW, [Step.FEEDBACK, Step.FINISH]),
         (Step.PLAN, [Step.ACT, Step.FINISH]),
         (Step.CLARIFY, [Step.FINISH]),
@@ -49,7 +49,8 @@ def test_conditions_read_the_turn() -> None:
     assert conditions.needs_plan(turn(Intent.TASK)) and conditions.needs_plan(turn(None))
     assert conditions.is_ambiguous(turn(Intent.AMBIGUOUS))
     assert conditions.asks_for_tools(planned)
-    assert not conditions.asks_for_tools_out_of_steps(planned)
+    assert not conditions.keeps_working_out_of_steps(planned)
+    assert conditions.leaves_plan_unfinished(planned)
     assert conditions.asks_for_plan_without_one(asking)
     assert conditions.retry_allowed(rejected)
     assert conditions.always(turn())

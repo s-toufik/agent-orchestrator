@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from agent_orchestrator.domain.tool.tool_call import ToolCall
 from agent_orchestrator.domain.tool.tool_result import ToolResult
+from agent_orchestrator.domain.turn.action import Action
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.feedback import Feedback
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.plan import Plan
+from agent_orchestrator.domain.turn.plan_progress import PlanProgress
 from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
 from agent_orchestrator.domain.turn.understanding import Understanding
@@ -55,6 +58,9 @@ class Turn:
         draft = self.last_draft
         if draft is None:
             return Answer.nothing()
+        progress = self.progress
+        if progress is not None and not progress.is_complete:
+            return Answer.plan_unfinished(progress)
         if draft.asks_for_tools:
             return Answer.budget_exhausted()
         if self.last_verdict is not None and self.last_verdict.rejects:
@@ -76,6 +82,26 @@ class Turn:
     @property
     def evidence(self) -> list[ToolResult]:
         return [item for item in self.work if isinstance(item, ToolResult)]
+
+    @property
+    def progress(self) -> PlanProgress | None:
+        return PlanProgress.of(self.plan, self.evidence) if self.plan else None
+
+    @property
+    def leaves_plan_unfinished(self) -> bool:
+        progress = self.progress
+        return progress is not None and not progress.is_complete
+
+    @property
+    def actions(self) -> list[Action]:
+        actions: list[Action] = []
+        calls: dict[str, ToolCall] = {}
+        for item in self.work:
+            if isinstance(item, Draft):
+                calls = {call.id: call for call in item.tool_calls}
+            elif isinstance(item, ToolResult) and item.call_id in calls:
+                actions.append(Action.of(calls[item.call_id], item))
+        return actions
 
     @property
     def last_draft(self) -> Draft | None:

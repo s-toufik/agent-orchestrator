@@ -7,6 +7,8 @@ the answer against what the user meant in the conversation.
 
 - Accept if the answer gives the user what they asked for and its logic holds.
 - Retry if it misses what the user asked for.
+- Retry if it says it did something (ran code, wrote or changed a file) that the tool
+  calls do not show, or that failed.
 {grounding}
 - Do not reject for style or wording.
 - Keep the critique short and concrete: what to fix.
@@ -24,8 +26,11 @@ Request, as interpreted:
 Success criteria:
 {criteria}
 
-Approved plan:
+Approved plan, with its progress (✓ done, → current, · to do):
 {plan}
+
+Tool calls made:
+{actions}
 
 Tool evidence:
 {evidence}
@@ -54,6 +59,7 @@ def reflection_request(
     request: str,
     criteria: list[str],
     plan: str | None,
+    actions: list[str],
     evidence: list[str],
     answer: str,
 ) -> str:
@@ -62,6 +68,7 @@ def reflection_request(
         request=request,
         criteria="\n".join(f"- {item}" for item in criteria) or "(none)",
         plan=plan or "(none)",
+        actions="\n".join(f"- {action}" for action in actions) or "(none)",
         evidence="\n---\n".join(evidence) or "(none)",
         answer=answer or "(empty answer)",
     )

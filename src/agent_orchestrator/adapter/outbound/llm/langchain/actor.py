@@ -8,7 +8,10 @@ from agent_orchestrator.adapter.outbound.llm.langchain.plan_request import (
     REQUEST_PLAN_TOOL,
     direct_draft,
 )
-from agent_orchestrator.adapter.outbound.llm.langchain.prompts.act import act_system_prompt
+from agent_orchestrator.adapter.outbound.llm.langchain.prompts.act import (
+    act_system_prompt,
+    next_step_request,
+)
 from agent_orchestrator.adapter.outbound.llm.langchain.reply.reply_reader import ReplyReader
 from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 from agent_orchestrator.domain.conversation.conversation import Conversation
@@ -35,13 +38,16 @@ class LangChainActor:
     async def act(
         self, conversation: Conversation, turn: Turn, tools: list[ToolSpecification]
     ) -> Draft:
-        plan = turn.plan
-        system = act_system_prompt(turn.query, plan.steps if plan else None, tools)
+        progress = turn.progress
+        system = act_system_prompt(turn.query, progress, tools)
         tail = [HumanMessage(content=turn.request), *from_work(turn.work)]
+        next_step = next_step_request(progress) if progress else None
+        if next_step:
+            tail.append(HumanMessage(content=next_step))
         messages = self._window.build(system, conversation, turn.settings.context_tokens, tail)
         model = self._models.for_role(AgentRole.ACT, turn.model)
         self._logger.debug(f"Calling the act model (step {turn.steps_taken + 1})")
-        if plan is None:
+        if progress is None:
             reader = self._final_reply if turn.is_plain_direct_answer else self._reply
             reply = await reader.read(model.bind_tools([REQUEST_PLAN_TOOL]), messages)
             return direct_draft(to_draft(reply))

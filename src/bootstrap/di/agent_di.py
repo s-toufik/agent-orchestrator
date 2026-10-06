@@ -108,6 +108,12 @@ class AgentDI(BaseDI):
             for name, connector in self._mcp_connectors.items()
         }
 
+    async def close(self) -> None:
+        await self._stop_factories()
+        await self._close_llm_http_client()
+        await self._close_mcp_session_factories()
+        await self._shutdown_telemetry()
+
     async def _close_mcp_session_factories(self) -> None:
         self.__dict__.pop("_mcp_session_factories", None)
 

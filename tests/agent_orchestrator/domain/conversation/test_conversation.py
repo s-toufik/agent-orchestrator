@@ -2,11 +2,12 @@ import pytest
 
 from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Message, Speaker
+from agent_orchestrator.domain.turn.action import Action
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.understanding import Understanding
-from tests.agent_orchestrator.domain.builders import PLAN, turn
+from tests.agent_orchestrator.domain.builders import PLAN, calling, result, turn
 
 
 def _waiting() -> Conversation:
@@ -63,6 +64,18 @@ def test_closing_a_turn_keeps_the_message_and_its_answer() -> None:
         Message(Speaker.USER, "msg"),
         Message(Speaker.ASSISTANT, "hello back"),
     ]
+
+
+def test_closing_a_turn_logs_the_tools_it_ran_and_keeps_only_the_latest() -> None:
+    old = [Action("echo", "", True, str(i)) for i in range(20)]
+    conversation, current = Conversation(id="c1", actions=list(old)), turn(plan=PLAN)
+    current.drafted(calling("echo"))
+    current.observed([result(output="new")])
+    current.finish(Answer.answered("done"))
+
+    conversation.close(current)
+
+    assert conversation.actions == [*old[1:], Action("echo", "", True, "new")]
 
 
 def test_compacting_keeps_only_the_last_messages_and_the_summary() -> None:

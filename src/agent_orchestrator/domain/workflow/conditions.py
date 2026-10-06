@@ -32,8 +32,13 @@ def asks_for_tools(turn: Turn) -> bool:
     return draft is not None and draft.asks_for_tools
 
 
-def asks_for_tools_out_of_steps(turn: Turn) -> bool:
-    return asks_for_tools(turn) and turn.steps_taken >= turn.settings.max_steps
+def leaves_plan_unfinished(turn: Turn) -> bool:
+    return turn.last_draft is not None and turn.leaves_plan_unfinished
+
+
+def keeps_working_out_of_steps(turn: Turn) -> bool:
+    keeps_working = asks_for_tools(turn) or leaves_plan_unfinished(turn)
+    return keeps_working and turn.steps_taken >= turn.settings.max_steps
 
 
 def is_plain_direct_answer(turn: Turn) -> bool:

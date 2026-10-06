@@ -7,6 +7,10 @@ from agent_orchestrator.adapter.outbound.llm.langchain.token_counter import coun
 from agent_orchestrator.domain.conversation.conversation import Conversation
 
 _SUMMARY_SECTION = "\n\nSummary of the earlier conversation:\n{summary}"
+_ACTIONS_SECTION = (
+    "\n\nTools you ran earlier in this conversation, oldest first "
+    "(reuse their results instead of running them again):\n{actions}"
+)
 
 
 def count_message_tokens(messages: Sequence[BaseMessage]) -> int:
@@ -25,6 +29,9 @@ class ContextWindow:
     ) -> list[BaseMessage]:
         if conversation.summary:
             system += _SUMMARY_SECTION.format(summary=conversation.summary)
+        if conversation.actions:
+            actions = "\n".join(f"- {action.render()}" for action in conversation.actions)
+            system += _ACTIONS_SECTION.format(actions=actions)
         head = SystemMessage(content=system)
         reserved = count_message_tokens([head, *tail])
         return [head, *self.history(conversation, budget - reserved), *tail]

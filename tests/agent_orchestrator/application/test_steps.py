@@ -9,9 +9,10 @@ from agent_orchestrator.application.step.summarize_step import SummarizeStep
 from agent_orchestrator.application.step.understand_step import UnderstandStep
 from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Message, Speaker
-from agent_orchestrator.domain.turn.answer import Answer
+from agent_orchestrator.domain.turn.answer import NO_PLAN, Answer
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.outcome import Outcome
+from agent_orchestrator.domain.turn.plan import PlannedStep
 from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.turn.verdict import Verdict
@@ -27,6 +28,8 @@ from tests.agent_orchestrator.application.fakes import (
     FakeTokens,
 )
 from tests.agent_orchestrator.domain.builders import PLAN, answer, calling, retry, turn
+
+ECHO_STEPS = (PlannedStep("echo", "echo"),)
 
 
 async def test_understanding_is_recorded_through_the_conversation(logger) -> None:
@@ -53,12 +56,21 @@ async def test_an_unreadable_message_is_understood_as_a_task(logger) -> None:
 async def test_a_plan_is_proposed_and_shown_for_approval() -> None:
     conversation, current = Conversation("c1"), turn(Intent.TASK)
 
-    await PlanStep(FakePlanner("1. echo"), FakeCatalog(ECHO)).run(conversation, current)
+    await PlanStep(FakePlanner(ECHO_STEPS), FakeCatalog(ECHO)).run(conversation, current)
 
     assert conversation.pending_plan is not None
-    assert conversation.pending_plan.steps == "1. echo"
+    assert conversation.pending_plan.steps == ECHO_STEPS
     assert current.answer is not None
     assert current.answer.outcome is Outcome.AWAITING_APPROVAL
+
+
+async def test_a_plan_that_could_not_be_written_is_said_plainly() -> None:
+    conversation, current = Conversation("c1"), turn(Intent.TASK)
+
+    await PlanStep(FakePlanner(None), FakeCatalog(ECHO)).run(conversation, current)
+
+    assert current.answer == Answer(NO_PLAN, Outcome.BEST_EFFORT)
+    assert conversation.pending_plan is None and current.plan is None
 
 
 async def test_a_clarifying_question_is_the_answer() -> None:
@@ -168,8 +180,8 @@ async def test_a_plan_runs_at_once_when_the_user_auto_approves() -> None:
     conversation, current = Conversation("c1"), turn(Intent.TASK)
     current.options = TurnOptions(auto_approve=True)
 
-    await PlanStep(FakePlanner("1. echo"), FakeCatalog(ECHO)).run(conversation, current)
+    await PlanStep(FakePlanner(ECHO_STEPS), FakeCatalog(ECHO)).run(conversation, current)
 
-    assert current.plan is not None and current.plan.steps == "1. echo"
+    assert current.plan is not None and current.plan.steps == ECHO_STEPS
     assert current.answer is None
     assert conversation.pending_plan is None

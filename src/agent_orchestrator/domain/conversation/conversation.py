@@ -3,11 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from agent_orchestrator.domain.conversation.message import Message, Speaker
+from agent_orchestrator.domain.turn.action import Action
 from agent_orchestrator.domain.turn.answer import Answer
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.plan import Plan
 from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.understanding import Understanding
+
+KEPT_ACTIONS: int = 20
 
 
 @dataclass
@@ -16,6 +19,7 @@ class Conversation:
     messages: list[Message] = field(default_factory=list)
     summary: str = ""
     pending_plan: Plan | None = None
+    actions: list[Action] = field(default_factory=list)
 
     def interpret(self, turn: Turn, understanding: Understanding) -> None:
         understanding = understanding.normalized(has_pending_plan=self.pending_plan is not None)
@@ -43,6 +47,7 @@ class Conversation:
         self.messages.extend(
             [Message(Speaker.USER, turn.request), Message(Speaker.ASSISTANT, answer)]
         )
+        self.actions = [*self.actions, *turn.actions][-KEPT_ACTIONS:]
 
     def older_than(self, keep_last: int) -> list[Message]:
         return self.messages[:-keep_last] if keep_last else list(self.messages)

@@ -2,6 +2,7 @@ from agent_orchestrator.adapter.outbound.llm.langchain.plan_request import REQUE
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.clock import utc_now
 from agent_orchestrator.adapter.outbound.llm.langchain.prompts.tool_catalog import tool_catalog
 from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
+from agent_orchestrator.domain.turn.plan_progress import PlanProgress
 
 _SYSTEM = """\
 You are BlueAI, an assistant for the Blue homelab platform.
@@ -38,8 +39,9 @@ Example:
 ```"""
 
 _EXECUTE = """\
-The user approved this plan. Carry it out step by step with your tools, then answer.
-{steps}
+The user approved this plan. Carry it out one step at a time with your tools.
+Progress (✓ done, → current, · to do):
+{progress}
 
 How to work:
 - For a quick look at data (a few rows, one value), call a tool directly.
@@ -48,6 +50,8 @@ How to work:
 - The working directory is your file storage: save large results there and read
   them back later. Use paths relative to it (e.g. "report.md"): they name the same
   file in your code and in tool calls. Give the file path in your answer.
+- To show a plot in a Markdown report, save the image in the working directory and
+  link it from the report: ![Title](plot.svg).
 
 Example inside python_executor (heavy analysis only):
     import pandas as pd
@@ -56,6 +60,16 @@ Example inside python_executor (heavy analysis only):
     ... do some analysis ...
     saved = file_writer(file_path="report.md", data=report_text)
     result = saved["path"]"""
+
+_FINISHED = """\
+All steps of the approved plan are done:
+{progress}
+
+Answer the request from the tool results. Give the path of every file you wrote."""
+
+_NEXT_STEP = """\
+Now do step {number}: {action}
+Call {tool} to do it. Do not describe the step instead of running it."""
 
 _DIRECT = f"""\
 You cannot run tools in this reply. Answer from the conversation and general knowledge.
@@ -71,12 +85,31 @@ Critique:
 Write the corrected answer. Fix only what the critique flags."""
 
 
-def act_system_prompt(request: str, plan_steps: str | None, tools: list[ToolSpecification]) -> str:
-    mode: str = _EXECUTE.format(steps=plan_steps) if plan_steps else _DIRECT
+def act_system_prompt(
+    request: str, progress: PlanProgress | None, tools: list[ToolSpecification]
+) -> str:
     return _SYSTEM.format(
-        request=request, tools=tool_catalog(tools), mode=mode, diagrams=_DIAGRAMS, now=utc_now()
+        request=request,
+        tools=tool_catalog(tools),
+        mode=_mode(progress),
+        diagrams=_DIAGRAMS,
+        now=utc_now(),
     )
 
 
 def act_feedback(critique: str) -> str:
     return _FEEDBACK.format(critique=critique)
+
+
+def next_step_request(progress: PlanProgress) -> str | None:
+    step = progress.current
+    if step is None:
+        return None
+    return _NEXT_STEP.format(number=progress.number, action=step.action, tool=step.tool)
+
+
+def _mode(progress: PlanProgress | None) -> str:
+    if progress is None:
+        return _DIRECT
+    template = _FINISHED if progress.is_complete else _EXECUTE
+    return template.format(progress=progress.render())

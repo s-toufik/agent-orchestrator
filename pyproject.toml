@@ -65,7 +65,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
-    "evaluation: live DeepEval agent-quality tests -- call a real local LLM and a real toolbox; excluded by default, run explicitly with `pytest -m evaluation tests/evaluation`",
+    "evaluation: everything under tests/evaluation (marked by its conftest) -- live agent evaluation against a real model and toolbox; excluded by default, run with `make evaluation`",
 ]
 addopts = "-m 'not evaluation'"
 

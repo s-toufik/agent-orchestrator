@@ -43,10 +43,7 @@ class AgentContainer(AgentDI):
         self.logging.info("Agent container booted")
 
     async def stop(self) -> None:
-        await self._stop_factories()
-        await self._close_llm_http_client()
-        await self._close_mcp_session_factories()
-        await self._shutdown_telemetry()
+        await self.close()
         self.logging.info("Agent container shut down")
 
     @property

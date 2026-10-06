@@ -5,7 +5,12 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from agent_orchestrator.adapter.outbound.llm.langchain.actor import LangChainActor
 from agent_orchestrator.adapter.outbound.llm.langchain.chat_models import ChatModels
 from agent_orchestrator.adapter.outbound.llm.langchain.context_window import ContextWindow
-from agent_orchestrator.adapter.outbound.llm.langchain.dto import UnderstandingDto, VerdictDto
+from agent_orchestrator.adapter.outbound.llm.langchain.dto import (
+    PlanDto,
+    PlanStepDto,
+    UnderstandingDto,
+    VerdictDto,
+)
 from agent_orchestrator.adapter.outbound.llm.langchain.intent_classifier import (
     LangChainIntentClassifier,
 )
@@ -20,8 +25,10 @@ from agent_orchestrator.adapter.outbound.llm.model_catalog import AgentRole
 from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Message, Speaker
 from agent_orchestrator.domain.tool.tool_specification import ToolSpecification
+from agent_orchestrator.domain.turn.action import Action
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
+from agent_orchestrator.domain.turn.plan import Plan, PlannedStep
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.turn.verdict import Verdict, VerdictAction
 from tests.agent_orchestrator.adapter.outbound.llm.langchain.fakes import (
@@ -69,7 +76,7 @@ async def test_the_classifier_reads_the_history_the_pending_plan_and_the_message
     assert fake.requested == [(AgentRole.CONTEXT, "m")]
     prompt = llm.prompt()
     assert "User: what is VaR?\nAssistant: A quantile." in prompt
-    assert PLAN.steps in prompt
+    assert PLAN.render() in prompt
     assert prompt.rstrip().endswith("msg")
 
 
@@ -85,7 +92,14 @@ async def test_an_unparsable_classification_is_none(logger) -> None:
 
 
 async def test_the_planner_revises_the_pending_plan_and_ends_on_the_request(logger) -> None:
-    llm = FakeLLM(replies=[text("  ## Plan\n1. echo  ")])
+    llm = FakeLLM(
+        parsed=[
+            PlanDto(
+                steps=[PlanStepDto(action="echo hi", tool="echo"), PlanStepDto(action="sum up")],
+                expected_result="A greeting.",
+            )
+        ]
+    )
     fake, models = _models(llm)
     conversation = _talked()
     conversation.propose(PLAN)
@@ -94,12 +108,50 @@ async def test_the_planner_revises_the_pending_plan_and_ends_on_the_request(logg
         conversation, turn(Intent.PLAN_REVISION), [ECHO]
     )
 
-    assert (plan.task, plan.steps) == ("the query", "## Plan\n1. echo")
+    assert plan == Plan(
+        "the query", (PlannedStep("echo hi", "echo"), PlannedStep("sum up")), "A greeting."
+    )
     assert fake.requested == [(AgentRole.PLAN, "m")]
     system = llm.calls[0][0]
-    assert isinstance(system, SystemMessage) and PLAN.steps in str(system.content)
+    assert isinstance(system, SystemMessage) and PLAN.render() in str(system.content)
     assert "- echo: Echoes." in str(system.content)
     assert llm.calls[0][-1] == HumanMessage(content="msg")
+
+
+async def test_a_planned_tool_that_does_not_exist_becomes_a_step_without_a_tool(logger) -> None:
+    llm = FakeLLM(
+        parsed=[PlanDto(steps=[PlanStepDto(action="x", tool="nope")], expected_result="")]
+    )
+
+    plan = await LangChainPlanner(_models(llm)[1], WINDOW, logger).plan(
+        Conversation("c1"), turn(Intent.TASK), [ECHO]
+    )
+
+    assert plan is not None and plan.steps == (PlannedStep("x"),)
+
+
+async def test_an_unreadable_plan_is_none(logger) -> None:
+    llm = FakeLLM(parsed=[None])
+
+    plan = await LangChainPlanner(_models(llm)[1], WINDOW, logger).plan(
+        Conversation("c1"), turn(Intent.TASK), [ECHO]
+    )
+
+    assert plan is None
+    assert logger.messages("warning") == ["The plan could not be read"]
+
+
+async def test_the_work_done_in_earlier_turns_is_shown_to_the_planner(logger) -> None:
+    llm = FakeLLM(parsed=[None])
+    conversation = Conversation(
+        "c1", actions=[Action("file_writer", "file_path='report.md'", True, "written")]
+    )
+
+    await LangChainPlanner(_models(llm)[1], WINDOW, logger).plan(
+        conversation, turn(Intent.TASK), [ECHO]
+    )
+
+    assert "- file_writer(file_path='report.md'): ok -> written" in str(llm.calls[0][0].content)
 
 
 async def test_outside_a_plan_the_actor_lists_its_tools_but_binds_only_the_plan_request(
@@ -137,7 +189,20 @@ async def test_under_a_plan_the_actor_binds_tools_and_replays_the_work(logger) -
     assert isinstance(tail[2], ToolMessage) and tail[2].tool_call_id == "c0"
     assert tail[3] == AIMessage(content="draft")
     assert isinstance(tail[4], HumanMessage) and "shorter" in str(tail[4].content)
-    assert PLAN.steps in llm.prompt()
+    assert "✓ 1. count (tool: echo)" in llm.prompt()
+
+
+async def test_while_a_step_is_open_the_actor_ends_on_the_next_step_to_do(logger) -> None:
+    llm = FakeLLM(replies=[text("Step 1: I counted.")])
+    current = turn(Intent.PLAN_APPROVAL, plan=PLAN)
+    current.drafted(answer("I will count."))
+
+    await _actor(llm, logger).act(Conversation("c1"), current, [ECHO])
+
+    assert llm.calls[0][-1] == HumanMessage(
+        content="Now do step 1: count\nCall echo to do it. "
+        "Do not describe the step instead of running it."
+    )
 
 
 async def test_the_reviewer_judges_the_draft_against_the_evidence_and_the_exchange(logger) -> None:
@@ -147,6 +212,7 @@ async def test_the_reviewer_judges_the_draft_against_the_evidence_and_the_exchan
     current.understood(
         Understanding(Intent.PLAN_APPROVAL, "count rows", success_criteria=("the count",))
     )
+    current.drafted(calling("echo"))
     current.observed([result(output="x" * 3_000)])
     current.drafted(answer("42 rows"))
 
@@ -156,7 +222,8 @@ async def test_the_reviewer_judges_the_draft_against_the_evidence_and_the_exchan
     assert fake.requested == [(AgentRole.REFLECTION, "m")]
     prompt = llm.prompt()
     assert "User: what is VaR?\nAssistant: A quantile.\nUser: msg" in prompt
-    assert "- the count" in prompt and PLAN.steps in prompt
+    assert "- the count" in prompt and "✓ 1. count (tool: echo)" in prompt
+    assert "- echo(): ok -> " + "x" * 300 + " [...]" in prompt
     assert "x" * 2_000 + " [...]" in prompt
     assert "42 rows" in prompt
     assert "not in the tool evidence" in prompt

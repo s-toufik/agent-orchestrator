@@ -2,7 +2,7 @@ from agent_orchestrator.domain.tool.tool_call import ToolCall
 from agent_orchestrator.domain.tool.tool_result import ToolResult
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
-from agent_orchestrator.domain.turn.plan import Plan
+from agent_orchestrator.domain.turn.plan import Plan, PlannedStep
 from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
 from agent_orchestrator.domain.turn.understanding import Understanding
@@ -37,8 +37,12 @@ def calling(*names: str) -> Draft:
     )
 
 
-def result(name: str = "echo", output: str = "ok") -> ToolResult:
-    return ToolResult(call_id="c0", tool_name=name, output=output)
+def result(name: str = "echo", output: str = "ok", call_id: str = "c0") -> ToolResult:
+    return ToolResult(call_id=call_id, tool_name=name, output=output)
+
+
+def failure(name: str = "echo", error: str = "boom", call_id: str = "c0") -> ToolResult:
+    return ToolResult.failure(call_id, name, error)
 
 
 def retry(critique: str = "too short") -> Verdict:
@@ -49,4 +53,6 @@ def accept() -> Verdict:
     return Verdict.accept()
 
 
-PLAN = Plan(task="count the rows", steps="1. count (tool: echo)")
+PLAN = Plan(
+    task="count the rows", steps=(PlannedStep("count", "echo"),), expected_result="A count."
+)

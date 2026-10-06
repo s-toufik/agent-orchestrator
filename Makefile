@@ -19,7 +19,7 @@ test:
 	uv run pytest --disable-warnings
 
 evaluation:
-	pytest -m evaluation tests/evaluation
+	uv run pytest -m evaluation tests/evaluation --disable-warnings
 
 lint:
 	uv run ruff check .

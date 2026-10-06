@@ -1,3 +1,5 @@
+from agent_orchestrator.domain.tool.tool_call import ToolCall
+from agent_orchestrator.domain.turn.action import Action
 from agent_orchestrator.domain.turn.answer import BUDGET_EXHAUSTED, NO_ANSWER, Answer
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
@@ -7,6 +9,7 @@ from tests.agent_orchestrator.domain.builders import (
     accept,
     answer,
     calling,
+    failure,
     result,
     retry,
     turn,
@@ -29,11 +32,56 @@ def test_a_draft_still_rejected_is_a_best_effort_answer() -> None:
     assert current.conclude() == Answer("41", Outcome.BEST_EFFORT)
 
 
-def test_pending_tool_calls_mean_the_step_budget_ran_out() -> None:
+def test_pending_tool_calls_after_the_plan_mean_the_step_budget_ran_out() -> None:
     current = turn(Intent.PLAN_APPROVAL, plan=PLAN)
+    current.drafted(calling("echo"))
+    current.observed([result()])
     current.drafted(calling("echo"))
 
     assert current.conclude() == Answer(BUDGET_EXHAUSTED, Outcome.BUDGET_EXHAUSTED)
+
+
+def test_an_unfinished_plan_is_reported_step_by_step_not_claimed_as_done() -> None:
+    current = turn(Intent.PLAN_APPROVAL, plan=PLAN)
+    current.drafted(answer("Step 1: I counted the rows."))
+
+    concluded = current.conclude()
+
+    assert concluded.outcome is Outcome.BUDGET_EXHAUSTED
+    assert "→ 1. count (tool: echo)" in concluded.text
+    assert "I counted" not in concluded.text
+
+
+def test_the_progress_follows_the_successful_results_of_the_plan() -> None:
+    current = turn(Intent.PLAN_APPROVAL, plan=PLAN)
+    assert current.leaves_plan_unfinished
+
+    current.observed([result()])
+
+    assert current.progress is not None and current.progress.is_complete
+    assert not current.leaves_plan_unfinished
+    assert turn(Intent.DIRECT).progress is None
+
+
+def test_actions_pair_each_tool_call_with_its_result() -> None:
+    current = turn(Intent.PLAN_APPROVAL, plan=PLAN)
+    current.drafted(calling("echo", "file_writer"))
+    current.observed([result(output="hi", call_id="c0"), failure("file_writer", call_id="c1")])
+
+    assert current.actions == [
+        Action("echo", "", True, "hi"),
+        Action("file_writer", "", False, "Error: boom"),
+    ]
+
+
+def test_an_action_keeps_short_arguments_and_clips_the_outcome() -> None:
+    call = ToolCall("1", "file_writer", {"file_path": "r.md", "data": "x" * 500, "n": 2})
+
+    action = Action.of(call, result("file_writer", "line one\n" + "y" * 400))
+
+    assert action.arguments == "file_path='r.md', n=2"
+    assert action.render().startswith("file_writer(file_path='r.md', n=2): ok -> line one yyy")
+    assert action.outcome.endswith(" [...]") and len(action.outcome) == 306
 
 
 def test_no_draft_means_no_answer() -> None:
@@ -73,7 +121,8 @@ def test_the_query_is_the_understood_request_or_the_raw_message() -> None:
 def test_the_approval_request_is_the_plan_awaiting_approval() -> None:
     approval = Answer.approval_request(PLAN)
 
-    assert (approval.text, approval.outcome) == (PLAN.steps, Outcome.AWAITING_APPROVAL)
+    assert (approval.text, approval.outcome) == (PLAN.render(), Outcome.AWAITING_APPROVAL)
+    assert approval.text == "## Plan\n1. count (tool: echo)\n## Expected result\nA count."
 
 
 def test_a_plan_request_is_neither_an_answer_nor_tool_calls() -> None:

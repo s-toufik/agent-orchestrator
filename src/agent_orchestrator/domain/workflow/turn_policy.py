@@ -2,10 +2,11 @@ from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.workflow.conditions import (
     asks_for_plan_without_one,
     asks_for_tools,
-    asks_for_tools_out_of_steps,
     has_approved_plan,
     is_ambiguous,
     is_plain_direct_answer,
+    keeps_working_out_of_steps,
+    leaves_plan_unfinished,
     needs_plan,
     retry_allowed,
 )
@@ -24,8 +25,9 @@ class TurnPolicy:
         Transition(Step.PLAN, Step.FINISH),
         Transition(Step.CLARIFY, Step.FINISH),
         Transition(Step.ACT, Step.PLAN, asks_for_plan_without_one),
-        Transition(Step.ACT, Step.FINISH, asks_for_tools_out_of_steps),
+        Transition(Step.ACT, Step.FINISH, keeps_working_out_of_steps),
         Transition(Step.ACT, Step.RUN_TOOLS, asks_for_tools),
+        Transition(Step.ACT, Step.ACT, leaves_plan_unfinished),
         Transition(Step.ACT, Step.FINISH, is_plain_direct_answer),
         Transition(Step.ACT, Step.REVIEW),
         Transition(Step.RUN_TOOLS, Step.ACT),

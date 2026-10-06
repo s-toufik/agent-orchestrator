@@ -10,6 +10,7 @@ from tests.agent_orchestrator.domain.builders import (
     accept,
     answer,
     calling,
+    failure,
     result,
     retry,
     turn,
@@ -73,7 +74,7 @@ def test_a_plain_direct_answer_is_not_reviewed() -> None:
     [
         _acted(turn(Intent.CONTINUATION), answer()),
         _acted(turn(Intent.DIRECT), calling("echo"), result(), answer()),
-        _acted(turn(Intent.PLAN_APPROVAL, plan=PLAN), answer()),
+        _acted(turn(Intent.PLAN_APPROVAL, plan=PLAN), calling("echo"), result(), answer()),
     ],
 )
 def test_any_other_answer_is_reviewed(current: Turn) -> None:
@@ -121,7 +122,20 @@ def test_an_actor_asking_for_a_plan_gets_one_when_the_turn_has_none() -> None:
     assert POLICY.next(Step.ACT, current) == Step.PLAN
 
 
-def test_under_an_approved_plan_a_plan_request_is_just_a_draft_to_review() -> None:
-    current = _acted(turn(Intent.PLAN_APPROVAL, plan=PLAN), Draft.asking_for_plan("more"))
+@pytest.mark.parametrize("draft", [answer("Step 1: done."), Draft.asking_for_plan("more")])
+def test_an_answer_before_the_plan_is_done_goes_back_to_work(draft: Draft) -> None:
+    current = _acted(turn(Intent.PLAN_APPROVAL, plan=PLAN), draft)
 
-    assert POLICY.next(Step.ACT, current) == Step.REVIEW
+    assert POLICY.next(Step.ACT, current) == Step.ACT
+
+
+def test_a_failed_step_is_still_open() -> None:
+    current = _acted(turn(Intent.PLAN_APPROVAL, plan=PLAN), calling("echo"), failure(), answer())
+
+    assert POLICY.next(Step.ACT, current) == Step.ACT
+
+
+def test_an_unfinished_plan_out_of_steps_ends_the_turn() -> None:
+    current = _acted(turn(Intent.PLAN_APPROVAL, max_steps=2, plan=PLAN), answer(), answer())
+
+    assert POLICY.next(Step.ACT, current) == Step.FINISH

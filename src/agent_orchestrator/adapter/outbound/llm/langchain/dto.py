@@ -1,6 +1,9 @@
+from collections.abc import Collection
+
 from pydantic import BaseModel, Field
 
 from agent_orchestrator.domain.turn.intent import Intent
+from agent_orchestrator.domain.turn.plan import Plan, PlannedStep
 from agent_orchestrator.domain.turn.understanding import Understanding
 from agent_orchestrator.domain.turn.verdict import Verdict, VerdictAction
 
@@ -28,3 +31,25 @@ class VerdictDto(BaseModel):
 
     def to_domain(self) -> Verdict:
         return Verdict(self.action, self.critique)
+
+
+class PlanStepDto(BaseModel):
+    action: str = Field(description="What this step does, in one sentence.")
+    tool: str | None = Field(
+        default=None, description="The one tool this step calls, or null if it calls none."
+    )
+
+
+class PlanDto(BaseModel):
+    steps: list[PlanStepDto]
+    expected_result: str = Field(description="One sentence: what the user gets.")
+
+    def to_domain(self, task: str, tools: Collection[str]) -> Plan:
+        return Plan(
+            task=task,
+            steps=tuple(
+                PlannedStep(step.action, step.tool if step.tool in tools else None)
+                for step in self.steps
+            ),
+            expected_result=self.expected_result,
+        )

@@ -90,7 +90,7 @@ A server-sent event stream; each frame is `event: <type>` + `data: <json>`. New 
 | `awaiting_approval` | The reply is a plan: answer **yes** to run it, or say what to change |
 | `clarification` | The reply is a question: the agent needs more detail |
 | `best_effort` | The answer did not pass the agent's own check within the retry limit |
-| `budget_exhausted` | The agent reached its step limit before finishing |
+| `budget_exhausted` | The agent reached its step limit before finishing; for a plan, the reply lists which steps ran and which did not |
 
 ### How a message is handled
 
@@ -104,8 +104,9 @@ Every message goes through **understand** first. What the agent understood decid
                             "yes" to a plan ─► ACT
 
   ACT ─┬─ needs tools, has no plan ───► PLAN
-       ├─ wants tools, no steps left ─► FINISH: step limit reached
+       ├─ more work, no steps left ───► FINISH: step limit reached
        ├─ calls tools ────────────────► RUN TOOLS ──► ACT
+       ├─ plan step still open ───────► ACT: "now do step N"
        ├─ plain direct answer ────────► FINISH: no check needed
        └─ otherwise ──────────────────► REVIEW ─┬─ rejected, can retry ─► FEEDBACK ─► ACT
                                                 └─ accepted, or no retry ─► FINISH
@@ -126,6 +127,8 @@ Some typical journeys:
 | "shorter" after an answer | understand → act → review → finish | `answered`, reworked from the conversation |
 
 A pending plan survives while you discuss it (a revision or an unclear message) and is dropped as soon as you move on to something else.
+
+A plan is a list of steps, each naming the one tool it calls. The agent carries it out one step at a time: a step is done only when its tool succeeds, so the agent cannot answer while a step is still open, and a reply that only describes a step sends it back to run it. The tools it ran stay in the conversation, so later messages reuse earlier results instead of running them again.
 
 ### Configure it
 
@@ -266,8 +269,9 @@ Hexagonal: the rules in the middle know nothing about HTTP, LangChain, LangGraph
 | plan | always | finish |
 | clarify | always | finish |
 | act | `asks_for_plan_without_one` | plan |
-| act | `asks_for_tools_out_of_steps` | finish |
+| act | `keeps_working_out_of_steps` (tool calls or an open plan step, no steps left) | finish |
 | act | `asks_for_tools` | run_tools |
+| act | `leaves_plan_unfinished` (an approved plan has a step whose tool has not succeeded) | act |
 | act | `is_plain_direct_answer` | finish |
 | act | always | review |
 | run_tools, feedback | always | act |
@@ -294,12 +298,108 @@ Hexagonal: the rules in the middle know nothing about HTTP, LangChain, LangGraph
 
 ```bash
 make check        # ruff + ty + pytest
-make test
+make test         # unit, scenario and architecture tests: never runs the evaluation
 make lint / make format / make typecheck
-make evaluation   # live quality evaluation: needs a real model server and toolbox
+make evaluation   # only tests/evaluation: live evaluation, needs a real model server and toolbox
 ```
 
-`tests/agent_orchestrator/scenarios/` runs whole turns on two runners — LangGraph and a plain in-memory loop over the same steps and policy — and requires the same answers, events and stored conversation from both.
+`tests/agent_orchestrator/scenarios/` runs whole turns on two runners — LangGraph and a plain in-memory loop over the same steps and policy — and requires the same answers, events and stored conversation from both. Scripted models make every route reachable, including the ones a real model rarely takes (a review rejection, a plan request from act, running out of steps).
+
+### Evaluating the agent with a real model
+
+How to run it:
+
+- **Start the toolbox** in its own terminal and leave it running.
+  ```bash
+  cd ../agent-toolbox
+  make run
+  ```
+- **Check `.env`** in this project: the toolbox URL uses `localhost` (the toolbox refuses `127.0.0.1`), and the model provider has its URL and key.
+  ```bash
+  TOOLBOX_URL=http://localhost:8000/mcp
+  LLM_BASE_URL=https://integrate.api.nvidia.com/v1
+  LLM_API_KEY=nvapi-...
+  ```
+- **Pick a model** your provider serves, by the name `GET /v1/models` lists (not the short key in `llm.yml`). A wrong name stops the run and lists the valid ones.
+  ```bash
+  curl -s http://localhost:8001/v1/models | grep '"name"'   # with the agent running
+  # "name": "nvidia/nemotron-3-super-120b-a12b"
+  ```
+- **Check the harness first**: no model, no cost.
+  ```bash
+  uv run pytest -m evaluation tests/evaluation/test_harness.py
+  # 13 passed
+  ```
+- **Run the evaluation.**
+  ```bash
+  EVAL_MODEL=nvidia/nemotron-3-super-120b-a12b make evaluation
+  ```
+- **Change the pass mark** if you want: a number from 0 to 1, `0.8` by default.
+  ```bash
+  EVAL_MODEL=nvidia/nemotron-3-super-120b-a12b EVAL_THRESHOLD=0.9 make evaluation
+  ```
+- **Run a single case** while working on it: `-k` takes words from the case's name joined by `and`, not a phrase.
+  ```bash
+  EVAL_MODEL=nvidia/nemotron-3-super-120b-a12b \
+    uv run pytest -m evaluation tests/evaluation/test_routes.py -k "ambiguous and clarifying"
+  ```
+- **Read the report**: the newest `.md` in `tests/evaluation/reports/` to read, the `.json` beside it to compare runs. The run also prints its path.
+  ```bash
+  open "$(ls -t tests/evaluation/reports/*.md | head -1)"
+  # tests/evaluation/reports/20261006-134050_nvidia-nemotron-3-super-120b-a12b.md
+  ```
+- **Leave a few minutes between full runs** on a rate-limited API: a run makes many calls, and a case that hits the limit is listed under "Not scored" instead of getting a score.
+  ```text
+  ## Not scored
+  - **test_the_agent_takes_the_expected_route[moving on ...]**: AgentUnavailableException: Error code: 429 - Too Many Requests
+  ```
+
+The agent itself does not need to be running: the evaluation builds its own, in the test process.
+
+Every test produces a **score from 0 to 1**, higher is better, and passes when its score is at or above `EVAL_THRESHOLD`:
+
+| File | Score |
+|---|---|
+| `test_routes.py` | The share of checks passed over a whole conversation from `harness/cases.py`: for each message, the route, intent, outcome, tools run, plan and answer its `Expect` sets, plus the contract rules below |
+| `test_answer_relevancy.py`, `test_faithfulness.py`, `test_tool_correctness.py`, `test_bias.py`, `test_toxicity.py`, `test_hallucination.py` | DeepEval's score, with the same model as judge: the share of the judge's verdicts that are good (for bias, the share of opinions judged unbiased) |
+
+The contract (`harness/contract.py`) holds for every message: it gets an answer, runs understand first and finish, summarize last, runs tools only under an approved plan, and stays within its step budget; a reply awaiting approval has a pending plan, and an answered plan has every step done and was reviewed.
+
+Each run writes a report to `tests/evaluation/reports/` (kept out of git), named after the time and the model: a `.md` to read and a `.json` to compare runs or models. The Markdown lists every score from the lowest up, what lowered each one, and the transitions of the routing table the model never took:
+
+```text
+# Agent evaluation: nvidia/nemotron-3-super-120b-a12b
+
+2026-10-06 14:30 · threshold 0.80 · mean score 0.94 · 14/15 at or above the threshold
+
+| Score | Result | Kind    | Test                                            |
+|------:|--------|---------|-------------------------------------------------|
+|  0.70 | FAIL   | route   | an ambiguous message gets a clarifying question |
+|  1.00 | pass   | quality | answer relevancy: a one-sentence question       |
+…
+```
+
+The terminal ends with the same summary and the report's path.
+
+To cover a new behavior, add a `Case` to `harness/cases.py`: the messages to send and an `Expect` for each one. Only the fields you set are checked:
+
+```python
+Case(
+    "a task waits for approval, then runs to the end of its plan",
+    (
+        Say(
+            "Use the python tool to compute 12 * 7.",
+            Expect(outcome=Outcome.AWAITING_APPROVAL, plan_tools=frozenset({"python_executor"})),
+        ),
+        Say(
+            "yes",
+            Expect(outcome=Outcome.ANSWERED, tools=("python_executor",), answer_contains=("84",)),
+        ),
+    ),
+)
+```
+
+Everything under `tests/evaluation/` is marked `evaluation` by its `conftest.py`, and `pyproject.toml` deselects that marker by default: `make test` and CI never run it, and `make evaluation` runs nothing else. A new file there needs no marker of its own. `test_harness.py` checks the harness itself and needs no model, so `uv run pytest -m evaluation tests/evaluation/test_harness.py` tells a broken check apart from a misbehaving model.
 
 Pre-commit hooks:
 

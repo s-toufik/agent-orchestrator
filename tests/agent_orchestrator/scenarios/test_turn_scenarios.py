@@ -31,10 +31,12 @@ from agent_orchestrator.domain.conversation.conversation import Conversation
 from agent_orchestrator.domain.conversation.message import Speaker
 from agent_orchestrator.domain.event.turn_event import TurnEvent, TurnEventKind
 from agent_orchestrator.domain.tool.tool_call import ToolCall
-from agent_orchestrator.domain.turn.answer import BUDGET_EXHAUSTED
+from agent_orchestrator.domain.turn.action import Action
+from agent_orchestrator.domain.turn.answer import BUDGET_EXHAUSTED, NO_PLAN
 from agent_orchestrator.domain.turn.draft import Draft
 from agent_orchestrator.domain.turn.intent import Intent
 from agent_orchestrator.domain.turn.outcome import Outcome
+from agent_orchestrator.domain.turn.plan import PlannedStep
 from agent_orchestrator.domain.turn.turn import Turn
 from agent_orchestrator.domain.turn.turn_options import TurnOptions
 from agent_orchestrator.domain.turn.turn_settings import TurnSettings
@@ -56,6 +58,7 @@ from tests.agent_orchestrator.application.fakes import (
 from tests.agent_orchestrator.domain.builders import accept, retry
 
 CONVERSATION = "c1"
+ECHO_HI = (PlannedStep("echo hi", "echo"),)
 
 
 class Agent:
@@ -64,7 +67,7 @@ class Agent:
         runner_kind: str,
         logger,
         understandings: list[Understanding] | None = None,
-        plans: list[str] | None = None,
+        plans: list[tuple[PlannedStep, ...] | None] | None = None,
         drafts: list[Draft] | None = None,
         verdicts: list | None = None,
     ) -> None:
@@ -149,7 +152,7 @@ async def test_a_task_is_planned_approved_then_executed_with_tools(runner_kind, 
             _understood(Intent.TASK, "say hi"),
             _understood(Intent.PLAN_APPROVAL, "yes"),
         ],
-        plans=["## Plan\n1. echo hi (tool: echo)"],
+        plans=[ECHO_HI],
         drafts=[_calls("echo"), Draft("echo said hi")],
         verdicts=[accept()],
     )
@@ -158,7 +161,7 @@ async def test_a_task_is_planned_approved_then_executed_with_tools(runner_kind, 
 
     assert proposal.answer is not None
     assert proposal.answer.outcome is Outcome.AWAITING_APPROVAL
-    assert "1. echo hi" in proposal.answer.text
+    assert "1. echo hi (tool: echo)" in proposal.answer.text
     assert agent.entered() == [Step.UNDERSTAND, Step.PLAN, Step.FINISH, Step.SUMMARIZE]
 
     answer = await agent.say("yes")
@@ -252,7 +255,7 @@ async def test_running_out_of_steps_ends_with_a_clear_message(runner_kind, logge
         runner_kind,
         logger,
         understandings=[_understood(Intent.TASK, "loop"), _understood(Intent.PLAN_APPROVAL, "yes")],
-        plans=["## Plan\n1. echo"],
+        plans=[ECHO_HI],
         drafts=[_calls("echo"), _calls("echo")],
     )
 
@@ -307,7 +310,7 @@ async def test_a_request_misread_as_direct_gets_a_plan_in_the_same_turn(
             _understood(Intent.DIRECT, "explain change.md"),
             _understood(Intent.PLAN_APPROVAL, "yes"),
         ],
-        plans=["## Plan\n1. read change.md (tool: echo)"],
+        plans=[(PlannedStep("read change.md", "echo"),)],
         drafts=[
             Draft.asking_for_plan("read change.md"),
             _calls("echo"),
@@ -337,7 +340,7 @@ async def test_with_auto_approve_a_task_is_planned_and_carried_out_in_one_turn(
         runner_kind,
         logger,
         understandings=[_understood(Intent.TASK, "say hi")],
-        plans=["## Plan\n1. echo hi (tool: echo)"],
+        plans=[ECHO_HI],
         drafts=[_calls("echo"), Draft("echo said hi")],
         verdicts=[accept()],
     )
@@ -367,7 +370,7 @@ async def test_with_auto_approve_a_request_misread_as_direct_still_ends_with_the
         runner_kind,
         logger,
         understandings=[_understood(Intent.DIRECT, "explain change.md")],
-        plans=["## Plan\n1. read change.md (tool: echo)"],
+        plans=[(PlannedStep("read change.md", "echo"),)],
         drafts=[
             Draft.asking_for_plan("read change.md"),
             _calls("echo"),
@@ -382,3 +385,91 @@ async def test_with_auto_approve_a_request_misread_as_direct_still_ends_with_the
     assert agent.executor.calls[0].name == "echo"
     executed: Turn = agent.actor.calls[1][1]
     assert executed.plan is not None and executed.work == []
+
+
+@RUNNERS
+async def test_a_step_described_instead_of_run_is_asked_for_again(runner_kind, logger) -> None:
+    agent = Agent(
+        runner_kind,
+        logger,
+        understandings=[_understood(Intent.TASK, "report"), _understood(Intent.PLAN_APPROVAL)],
+        plans=[(PlannedStep("compute", "echo"), PlannedStep("write the report", "file_writer"))],
+        drafts=[
+            _calls("echo"),
+            Draft("Step 2: I wrote the report."),
+            _calls("file_writer"),
+            Draft("The report is in report.md."),
+        ],
+        verdicts=[accept()],
+    )
+
+    await agent.say("report")
+    answer = await agent.say("yes")
+
+    assert answer.answer is not None and answer.answer.text == "The report is in report.md."
+    assert [call.name for call in agent.executor.calls] == ["echo", "file_writer"]
+    assert agent.entered() == [
+        Step.UNDERSTAND,
+        Step.ACT,
+        Step.RUN_TOOLS,
+        Step.ACT,
+        Step.ACT,
+        Step.RUN_TOOLS,
+        Step.ACT,
+        Step.REVIEW,
+        Step.FINISH,
+        Step.SUMMARIZE,
+    ]
+    reviewed: Turn = agent.reviewer.calls[0][1]
+    assert [action.tool for action in reviewed.actions] == ["echo", "file_writer"]
+
+
+@RUNNERS
+async def test_a_plan_left_unfinished_is_reported_honestly(runner_kind, logger) -> None:
+    agent = Agent(
+        runner_kind,
+        logger,
+        understandings=[_understood(Intent.TASK, "report"), _understood(Intent.PLAN_APPROVAL)],
+        plans=[(PlannedStep("compute", "echo"), PlannedStep("write the report", "file_writer"))],
+        drafts=[_calls("echo"), Draft("I combined it and wrote it back."), Draft("Done!")],
+    )
+
+    await agent.say("report")
+    answer = await agent.say("yes", TurnSettings(max_steps=3))
+
+    assert answer.answer is not None
+    assert answer.answer.outcome is Outcome.BUDGET_EXHAUSTED
+    assert "✓ 1. compute" in answer.answer.text
+    assert "→ 2. write the report" in answer.answer.text
+    assert "wrote it back" not in answer.answer.text
+    assert agent.reviewer.calls == []
+
+
+@RUNNERS
+async def test_the_next_turn_knows_which_tools_ran_before(runner_kind, logger) -> None:
+    agent = Agent(
+        runner_kind,
+        logger,
+        understandings=[_understood(Intent.TASK, "say hi"), _understood(Intent.TASK, "again")],
+        plans=[ECHO_HI, ECHO_HI],
+        drafts=[_calls("echo"), Draft("echo said hi")],
+        verdicts=[accept()],
+    )
+
+    await agent.say("say hi", auto_approve=True)
+    await agent.say("again")
+
+    replanned: Conversation = agent.planner.calls[-1][0]
+    assert replanned.actions == [Action("echo", "text='hi'", True, "echo:hi")]
+    assert (await agent.stored()).actions == replanned.actions
+
+
+@RUNNERS
+async def test_a_plan_that_cannot_be_written_ends_the_turn_plainly(runner_kind, logger) -> None:
+    agent = Agent(runner_kind, logger, understandings=[_understood(Intent.TASK, "x")], plans=[None])
+
+    answer = await agent.say("x")
+
+    assert answer.answer is not None
+    assert (answer.answer.text, answer.answer.outcome) == (NO_PLAN, Outcome.BEST_EFFORT)
+    assert (await agent.stored()).pending_plan is None

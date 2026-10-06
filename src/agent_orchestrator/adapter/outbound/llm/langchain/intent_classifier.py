@@ -29,7 +29,7 @@ class LangChainIntentClassifier:
             SystemMessage(content=context_system_prompt(UnderstandingDto.model_json_schema())),
             HumanMessage(
                 content=context_request(
-                    render(history), pending.steps if pending else None, turn.request
+                    render(history), pending.render() if pending else None, turn.request
                 )
             ),
         ]

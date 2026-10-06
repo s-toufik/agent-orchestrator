@@ -33,6 +33,7 @@ class LangChainReviewer:
     async def review(self, conversation: Conversation, turn: Turn) -> Verdict | None:
         understanding = turn.understanding
         draft = turn.last_draft
+        progress = turn.progress
         messages = [
             SystemMessage(
                 content=reflection_system_prompt(
@@ -44,7 +45,8 @@ class LangChainReviewer:
                     conversation=self._recent(conversation, turn),
                     request=turn.query,
                     criteria=list(understanding.success_criteria) if understanding else [],
-                    plan=turn.plan.steps if turn.plan else None,
+                    plan=progress.render() if progress else None,
+                    actions=[action.render() for action in turn.actions],
                     evidence=[
                         self._clip(result.content, self._max_evidence_chars)
                         for result in turn.evidence
